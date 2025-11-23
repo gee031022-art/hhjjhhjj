@@ -243,22 +243,6 @@
             border-radius: 3px;
         }
         
-        .sensor-value {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .sensor-label {
-            font-size: 0.7em;
-            color: #888;
-        }
-        
-        .sensor-num {
-            font-size: 0.95em;
-            font-weight: bold;
-            color: #00ff88;
-        }
-        
         .response-box {
             margin-top: 12px;
             padding: 10px;
@@ -611,14 +595,9 @@
                 const doorPosition = new THREE.Vector3(0.6, 1.5, -2.85);
                 sensorData.distance = Math.round(camera.position.distanceTo(doorPosition) * 100);
                 
-                if (sensorData.distance < 150) {
-                    if (!sensorData.dwellStartTime) {
-                        sensorData.dwellStartTime = Date.now();
-                    }
+                // ✅ 체류시간 업데이트 (배회 중에는 detectLoitering에서 시작)
+                if (sensorData.dwellStartTime) {
                     sensorData.dwellTime = Math.floor((Date.now() - sensorData.dwellStartTime) / 1000);
-                } else {
-                    sensorData.dwellStartTime = null;
-                    sensorData.dwellTime = 0;
                 }
                 
                 detectLoitering();
@@ -630,6 +609,7 @@
             }, 100);
         }
         
+        // ✅ 배회 로직 수정: 배회하면 체류시간도 자동 증가
         function detectLoitering() {
             const currentPos = camera.position.clone();
             const doorPos = new THREE.Vector3(0.6, 1.5, -2.85);
@@ -637,12 +617,14 @@
             
             if (distanceToDoor < 3) {
                 const movementDelta = currentPos.distanceTo(sensorData.lastPosition);
+                
                 if (movementDelta > 0.01) {
                     sensorData.totalMovement += movementDelta;
                     sensorData.positionHistory.push(currentPos.clone());
                     if (sensorData.positionHistory.length > 20) {
                         sensorData.positionHistory.shift();
                     }
+                    
                     if (sensorData.positionHistory.length >= 3) {
                         const recent = sensorData.positionHistory.slice(-3);
                         const dir1 = new THREE.Vector3().subVectors(recent[1], recent[0]).normalize();
@@ -652,37 +634,43 @@
                         }
                     }
                 }
+                
                 sensorData.loiteringScore = Math.min(
                     (sensorData.totalMovement / 10) * 0.6 + (sensorData.directionChanges / 5) * 0.4, 1.0
                 );
+                
+                // ✅ 핵심 수정: 배회 중이면 체류시간 타이머 자동 시작
+                if (!sensorData.dwellStartTime) {
+                    sensorData.dwellStartTime = Date.now();
+                }
+                
                 sensorData.lastPosition.copy(currentPos);
             } else {
                 sensorData.loiteringScore = Math.max(0, sensorData.loiteringScore - 0.01);
+                
                 if (distanceToDoor > 5) {
                     sensorData.totalMovement = 0;
                     sensorData.directionChanges = 0;
                     sensorData.positionHistory = [];
+                    // ✅ 멀어지면 체류시간도 리셋
+                    sensorData.dwellStartTime = null;
+                    sensorData.dwellTime = 0;
                 }
             }
         }
         
-        // ✅ FIX: min() 제한 제거! (무한 누적 가능)
         function getThreatLevel() {
             let d = Math.max(0, (300 - sensorData.distance) / 300);
             let t = Math.min(sensorData.dwellTime / 30, 1);
             let l = sensorData.loiteringScore;
-            
-            // ✅ 변경: min() 없이 직접 사용 (기여도가 1.0 이상도 가능!)
-            let v = sensorData.vibration / 20;       // 무제한 누적
-            let a = (sensorData.audio - 40) / 100;   // 무제한 누적
-            
+            let v = sensorData.vibration / 20;
+            let a = (sensorData.audio - 40) / 100;
             let h = sensorData.housingOpen ? 1 : 0;
             
-            // ✅ 최종 위험도 = 누적식 합산 (1.0 이상 가능!)
             let score = d * 0.20 + t * 0.20 + l * 0.20 + v * 0.20 + a * 0.15 + h * 0.05;
             
             return {
-                score: score,  // 실제 누적값 (1.0 이상도 가능)
+                score: score,
                 level: score < 0.3 ? 'SAFE' : score < 0.6 ? 'CAUTION' : score < 0.85 ? 'DANGER' : 'CRITICAL',
                 contributions: { 
                     d: d * 0.20, 
@@ -719,12 +707,10 @@
             const threat = getThreatLevel();
             const { score, level, contributions } = threat;
             
-            // 위험도 표시 (1.0 이상도 표시됨)
             document.getElementById('risk-score').textContent = score.toFixed(2);
             document.getElementById('risk-score').style.color = 
                 level === 'SAFE' ? '#00ff88' : level === 'CAUTION' ? '#ffff00' : level === 'DANGER' ? '#ff8800' : '#ff0044';
             
-            // 게이지 (최대 100%)
             const gauge = document.getElementById('risk-gauge');
             gauge.style.width = Math.min(score * 100, 100) + '%';
             gauge.className = 'risk-gauge-fill ' + level.toLowerCase();
