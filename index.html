@@ -24,9 +24,9 @@
             left: 0;
             width: 100%;
             height: 100%;
+            z-index: 1;
         }
         
-        /* 화면 중앙 위험 수치 표시 */
         #screen-risk-display {
             position: fixed;
             top: 50%;
@@ -186,6 +186,8 @@
             border-radius: 15px;
             padding: 25px;
             min-width: 320px;
+            max-height: 90vh;
+            overflow-y: auto;
             transition: all 0.3s;
             z-index: 100;
         }
@@ -252,23 +254,13 @@
             height: 100%;
             transition: width 0.3s, background 0.3s;
             border-radius: 15px;
-            position: relative;
             box-shadow: 0 0 20px currentColor;
         }
         
-        .risk-gauge-fill.safe {
-            background: linear-gradient(90deg, #00ff88, #00ddaa);
-        }
-        
-        .risk-gauge-fill.caution {
-            background: linear-gradient(90deg, #ffff00, #ffaa00);
-        }
-        
-        .risk-gauge-fill.danger {
-            background: linear-gradient(90deg, #ff8800, #ff4400);
-        }
-        
-        .risk-gauge-fill.critical {
+        .risk-gauge-fill.safe { background: linear-gradient(90deg, #00ff88, #00ddaa); }
+        .risk-gauge-fill.caution { background: linear-gradient(90deg, #ffff00, #ffaa00); }
+        .risk-gauge-fill.danger { background: linear-gradient(90deg, #ff8800, #ff4400); }
+        .risk-gauge-fill.critical { 
             background: linear-gradient(90deg, #ff0044, #aa0022);
             animation: pulse-gauge 1s infinite;
         }
@@ -284,21 +276,6 @@
             font-size: 0.75em;
             color: #888;
             margin-top: 5px;
-        }
-        
-        .risk-marker {
-            position: relative;
-        }
-        
-        .risk-marker::before {
-            content: '';
-            position: absolute;
-            top: -35px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 2px;
-            height: 30px;
-            background: rgba(255, 255, 255, 0.3);
         }
         
         .sensor-breakdown {
@@ -318,14 +295,6 @@
             font-size: 0.9em;
         }
         
-        .sensor-label {
-            color: #aaa;
-        }
-        
-        .sensor-value {
-            font-weight: bold;
-        }
-        
         .sensor-bar {
             height: 8px;
             background: rgba(255, 255, 255, 0.1);
@@ -335,7 +304,7 @@
         
         .sensor-bar-fill {
             height: 100%;
-            transition: width 0.3s, background 0.3s;
+            transition: width 0.3s;
             border-radius: 4px;
         }
         
@@ -387,7 +356,6 @@
             z-index: 200;
         }
         
-        /* 마우스 모드 인디케이터 */
         #mouse-mode-indicator {
             position: fixed;
             bottom: 20px;
@@ -411,21 +379,28 @@
             border-color: #ffaa00;
             box-shadow: 0 0 20px rgba(255, 170, 0, 0.6);
         }
+        
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2em;
+            color: #00ff88;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
+    <div id="loading">⏳ 로딩 중...</div>
     <div id="canvas-container"></div>
     
-    <!-- 화면 중앙 위험 수치 -->
     <div id="screen-risk-display">
         <div class="screen-risk-value safe" id="screen-risk-value">0.00</div>
         <div class="screen-risk-label" id="screen-risk-label">SAFE</div>
     </div>
     
-    <!-- 마우스 모드 인디케이터 -->
-    <div id="mouse-mode-indicator" class="cursor-mode">
-        🖱️ 커서 모드
-    </div>
+    <div id="mouse-mode-indicator" class="cursor-mode">🖱️ 커서 모드</div>
     
     <div id="controls-guide">
         <div class="guide-title">🎮 조작 방법</div>
@@ -439,30 +414,19 @@
             <span class="key">Shift</span> 달리기
         </div>
         <div class="control-item" style="background: rgba(255, 170, 0, 0.2); border-left: 4px solid #ffaa00;">
-            <span class="mouse-icon">좌클릭</span> 버튼 클릭 / 커서 조작
+            <span class="mouse-icon">좌클릭</span> 버튼 클릭
         </div>
         <div class="control-item" style="background: rgba(0, 255, 136, 0.2); border-left: 4px solid #00ff88;">
             <span class="mouse-icon">우클릭 홀드</span> 시점 회전
-        </div>
-        <div style="margin-top: 15px; padding: 10px; background: rgba(255, 170, 0, 0.2); border-radius: 5px; font-size: 0.85em;">
-            💡 오른쪽 버튼을 누르고 있는 동안 마우스 이동으로 시점 회전!
         </div>
     </div>
     
     <div id="action-panel">
         <div class="action-title">⚡ 행동</div>
-        <button class="action-btn bell" onclick="ringDoorbell()">
-            🔔 도어벨 누르기
-        </button>
-        <button class="action-btn drill" onclick="useDrill()">
-            🔨 드릴 사용 (3초)
-        </button>
-        <button class="action-btn kick" onclick="kickDoor()">
-            👟 문 차기
-        </button>
-        <button class="action-btn" onclick="openHousing()" style="border-color: #ff0044;">
-            🔓 외함 열기
-        </button>
+        <button class="action-btn bell" onclick="ringDoorbell()">🔔 도어벨 누르기</button>
+        <button class="action-btn drill" onclick="useDrill()">🔨 드릴 사용 (3초)</button>
+        <button class="action-btn kick" onclick="kickDoor()">👟 문 차기</button>
+        <button class="action-btn" onclick="openHousing()" style="border-color: #ff0044;">🔓 외함 열기</button>
     </div>
     
     <div id="status-panel" class="SAFE">
@@ -477,11 +441,11 @@
                 <div class="risk-gauge-fill safe" id="risk-gauge" style="width: 0%;"></div>
             </div>
             <div class="risk-markers">
-                <div class="risk-marker">0.0<br>안전</div>
-                <div class="risk-marker">0.3<br>주의</div>
-                <div class="risk-marker">0.6<br>위험</div>
-                <div class="risk-marker">0.85<br>치명</div>
-                <div class="risk-marker">1.0</div>
+                <div>0.0<br>안전</div>
+                <div>0.3<br>주의</div>
+                <div>0.6<br>위험</div>
+                <div>0.85<br>치명</div>
+                <div>1.0</div>
             </div>
         </div>
         
@@ -490,8 +454,8 @@
             
             <div class="sensor-item">
                 <div class="sensor-header">
-                    <span class="sensor-label">거리 (25%)</span>
-                    <span class="sensor-value" id="distance-contribution">0.00</span>
+                    <span style="color: #aaa;">거리 (25%)</span>
+                    <span style="font-weight: bold;" id="distance-contribution">0.00</span>
                 </div>
                 <div class="sensor-bar">
                     <div class="sensor-bar-fill" id="distance-bar" style="background: #00ff88; width: 0%;"></div>
@@ -500,8 +464,8 @@
             
             <div class="sensor-item">
                 <div class="sensor-header">
-                    <span class="sensor-label">체류시간 (25%)</span>
-                    <span class="sensor-value" id="dwell-contribution">0.00</span>
+                    <span style="color: #aaa;">체류시간 (25%)</span>
+                    <span style="font-weight: bold;" id="dwell-contribution">0.00</span>
                 </div>
                 <div class="sensor-bar">
                     <div class="sensor-bar-fill" id="dwell-bar" style="background: #ffaa00; width: 0%;"></div>
@@ -510,8 +474,8 @@
             
             <div class="sensor-item">
                 <div class="sensor-header">
-                    <span class="sensor-label">진동 (20%)</span>
-                    <span class="sensor-value" id="vibration-contribution">0.00</span>
+                    <span style="color: #aaa;">진동 (20%)</span>
+                    <span style="font-weight: bold;" id="vibration-contribution">0.00</span>
                 </div>
                 <div class="sensor-bar">
                     <div class="sensor-bar-fill" id="vibration-bar" style="background: #ff8800; width: 0%;"></div>
@@ -520,8 +484,8 @@
             
             <div class="sensor-item">
                 <div class="sensor-header">
-                    <span class="sensor-label">음압 (15%)</span>
-                    <span class="sensor-value" id="audio-contribution">0.00</span>
+                    <span style="color: #aaa;">음압 (15%)</span>
+                    <span style="font-weight: bold;" id="audio-contribution">0.00</span>
                 </div>
                 <div class="sensor-bar">
                     <div class="sensor-bar-fill" id="audio-bar" style="background: #ff4400; width: 0%;"></div>
@@ -530,8 +494,8 @@
             
             <div class="sensor-item">
                 <div class="sensor-header">
-                    <span class="sensor-label">외함 (15%)</span>
-                    <span class="sensor-value" id="housing-contribution">0.00</span>
+                    <span style="color: #aaa;">외함 (15%)</span>
+                    <span style="font-weight: bold;" id="housing-contribution">0.00</span>
                 </div>
                 <div class="sensor-bar">
                     <div class="sensor-bar-fill" id="housing-bar" style="background: #ff0044; width: 0%;"></div>
@@ -574,15 +538,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
         let scene, camera, renderer, player, door, doorLock, sensors;
-        let clock = new THREE.Clock();
-        
-        // 마우스 모드
         let isRightMouseDown = false;
-        let lastMouseX = 0;
-        let lastMouseY = 0;
+        let lastMouseX = 0, lastMouseY = 0;
         
         let playerState = {
-            position: new THREE.Vector3(0, 1, 5),
+            position: new THREE.Vector3(0, 1.6, 5),
             velocity: new THREE.Vector3(0, 0, 0),
             rotation: 0,
             pitch: 0,
@@ -591,10 +551,7 @@
             sprintMultiplier: 2
         };
         
-        let keys = {
-            w: false, a: false, s: false, d: false,
-            space: false, shift: false
-        };
+        let keys = { w: false, a: false, s: false, d: false, space: false, shift: false };
         
         let sensorData = {
             distance: 300,
@@ -606,114 +563,107 @@
         };
         
         function initScene() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0a0e27);
-            scene.fog = new THREE.Fog(0x0a0e27, 1, 50);
-            
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.copy(playerState.position);
-            
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.shadowMap.enabled = true;
-            document.getElementById('canvas-container').appendChild(renderer.domElement);
-            
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-            scene.add(ambientLight);
-            
-            const spotLight = new THREE.SpotLight(0xffffff, 1);
-            spotLight.position.set(0, 10, 0);
-            spotLight.castShadow = true;
-            scene.add(spotLight);
-            
-            const gridHelper = new THREE.GridHelper(50, 50, 0x00ff88, 0x003344);
-            scene.add(gridHelper);
-            
-            const wallGeometry = new THREE.BoxGeometry(10, 5, 0.2);
-            const wallMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x1a1a2e,
-                metalness: 0.5,
-                roughness: 0.5
-            });
-            const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-            wall.position.set(0, 2.5, -3);
-            wall.receiveShadow = true;
-            scene.add(wall);
-            
-            const doorGeometry = new THREE.BoxGeometry(1.5, 3, 0.15);
-            const doorMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x2a2a3e,
-                metalness: 0.7,
-                roughness: 0.3
-            });
-            door = new THREE.Mesh(doorGeometry, doorMaterial);
-            door.position.set(0, 1.5, -2.9);
-            door.castShadow = true;
-            scene.add(door);
-            
-            const lockGeometry = new THREE.BoxGeometry(0.3, 0.5, 0.15);
-            const lockMaterial = new THREE.MeshStandardMaterial({ 
-                color: 0x00ff88,
-                metalness: 0.9,
-                roughness: 0.1,
-                emissive: 0x00ff88,
-                emissiveIntensity: 0.5
-            });
-            doorLock = new THREE.Mesh(lockGeometry, lockMaterial);
-            doorLock.position.set(0.6, 1.5, -2.85);
-            scene.add(doorLock);
-            
-            sensors = new THREE.Group();
-            for (let i = 0; i < 3; i++) {
-                const sensorGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.1);
-                const sensorMaterial = new THREE.MeshStandardMaterial({ 
+            try {
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x0a0e27);
+                scene.fog = new THREE.Fog(0x0a0e27, 1, 50);
+                
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                camera.position.copy(playerState.position);
+                
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.shadowMap.enabled = true;
+                document.getElementById('canvas-container').appendChild(renderer.domElement);
+                
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+                scene.add(ambientLight);
+                
+                const spotLight = new THREE.SpotLight(0xffffff, 1);
+                spotLight.position.set(0, 10, 0);
+                spotLight.castShadow = true;
+                scene.add(spotLight);
+                
+                const gridHelper = new THREE.GridHelper(50, 50, 0x00ff88, 0x003344);
+                scene.add(gridHelper);
+                
+                const wallGeometry = new THREE.BoxGeometry(10, 5, 0.2);
+                const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x1a1a2e });
+                const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+                wall.position.set(0, 2.5, -3);
+                scene.add(wall);
+                
+                const doorGeometry = new THREE.BoxGeometry(1.5, 3, 0.15);
+                const doorMaterial = new THREE.MeshStandardMaterial({ color: 0x2a2a3e });
+                door = new THREE.Mesh(doorGeometry, doorMaterial);
+                door.position.set(0, 1.5, -2.9);
+                scene.add(door);
+                
+                const lockGeometry = new THREE.BoxGeometry(0.3, 0.5, 0.15);
+                const lockMaterial = new THREE.MeshStandardMaterial({ 
                     color: 0x00ff88,
                     emissive: 0x00ff88,
-                    emissiveIntensity: 1.0
+                    emissiveIntensity: 0.5
                 });
-                const sensor = new THREE.Mesh(sensorGeometry, sensorMaterial);
-                sensor.position.set((i - 1) * 0.3, 0.5, -2.8);
-                sensor.rotation.x = Math.PI / 2;
-                sensors.add(sensor);
+                doorLock = new THREE.Mesh(lockGeometry, lockMaterial);
+                doorLock.position.set(0.6, 1.5, -2.85);
+                scene.add(doorLock);
+                
+                sensors = new THREE.Group();
+                for (let i = 0; i < 3; i++) {
+                    const sensorGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.1);
+                    const sensorMaterial = new THREE.MeshStandardMaterial({ 
+                        color: 0x00ff88,
+                        emissive: 0x00ff88,
+                        emissiveIntensity: 1.0
+                    });
+                    const sensor = new THREE.Mesh(sensorGeometry, sensorMaterial);
+                    sensor.position.set((i - 1) * 0.3, 0.5, -2.8);
+                    sensor.rotation.x = Math.PI / 2;
+                    sensors.add(sensor);
+                }
+                scene.add(sensors);
+                
+                const handGeometry = new THREE.BoxGeometry(0.2, 0.1, 0.3);
+                const handMaterial = new THREE.MeshStandardMaterial({ color: 0xffcc99 });
+                player = new THREE.Mesh(handGeometry, handMaterial);
+                player.position.set(0.3, -0.3, -0.5);
+                camera.add(player);
+                scene.add(camera);
+                
+                document.addEventListener('keydown', onKeyDown);
+                document.addEventListener('keyup', onKeyUp);
+                
+                renderer.domElement.addEventListener('mousedown', onMouseDown);
+                renderer.domElement.addEventListener('mouseup', onMouseUp);
+                renderer.domElement.addEventListener('mousemove', onMouseMove);
+                renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+                
+                document.getElementById('loading').style.display = 'none';
+                
+                animate();
+                updateSensors();
+                
+                console.log('✅ Three.js 초기화 완료');
+            } catch (error) {
+                console.error('❌ Three.js 초기화 실패:', error);
+                document.getElementById('loading').textContent = '오류 발생: ' + error.message;
             }
-            scene.add(sensors);
-            
-            const handGeometry = new THREE.BoxGeometry(0.2, 0.1, 0.3);
-            const handMaterial = new THREE.MeshStandardMaterial({ color: 0xffcc99 });
-            player = new THREE.Mesh(handGeometry, handMaterial);
-            player.position.set(0.3, -0.3, -0.5);
-            camera.add(player);
-            scene.add(camera);
-            
-            // 이벤트 리스너
-            document.addEventListener('keydown', onKeyDown);
-            document.addEventListener('keyup', onKeyUp);
-            
-            // 마우스 이벤트 (우클릭으로 시점 회전)
-            renderer.domElement.addEventListener('mousedown', onMouseDown);
-            renderer.domElement.addEventListener('mouseup', onMouseUp);
-            renderer.domElement.addEventListener('mousemove', onMouseMove);
-            renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
-            
-            animate();
-            updateSensors();
         }
         
         function onMouseDown(e) {
-            if (e.button === 2) { // 우클릭
+            if (e.button === 2) {
                 isRightMouseDown = true;
                 lastMouseX = e.clientX;
                 lastMouseY = e.clientY;
                 updateMouseMode();
-                renderer.domElement.style.cursor = 'grabbing';
             }
         }
         
         function onMouseUp(e) {
-            if (e.button === 2) { // 우클릭
+            if (e.button === 2) {
                 isRightMouseDown = false;
                 updateMouseMode();
-                renderer.domElement.style.cursor = 'default';
             }
         }
         
@@ -722,10 +672,7 @@
                 const deltaX = e.clientX - lastMouseX;
                 const deltaY = e.clientY - lastMouseY;
                 
-                // 좌우 회전 (yaw)
                 playerState.rotation -= deltaX * 0.003;
-                
-                // 상하 회전 (pitch)
                 playerState.pitch -= deltaY * 0.003;
                 playerState.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, playerState.pitch));
                 
@@ -802,7 +749,6 @@
             camera.position.x = Math.max(-8, Math.min(8, camera.position.x));
             camera.position.z = Math.max(-2.5, Math.min(10, camera.position.z));
             
-            // 카메라 회전 적용
             camera.rotation.y = playerState.rotation;
             camera.rotation.x = playerState.pitch;
             
@@ -891,17 +837,13 @@
             const level = threat.level;
             const contrib = threat.contributions;
             
-            const screenValue = document.getElementById('screen-risk-value');
-            const screenLabel = document.getElementById('screen-risk-label');
-            screenValue.textContent = score.toFixed(2);
-            screenLabel.textContent = level;
-            screenValue.className = 'screen-risk-value ' + level.toLowerCase();
+            document.getElementById('screen-risk-value').textContent = score.toFixed(2);
+            document.getElementById('screen-risk-label').textContent = level;
+            document.getElementById('screen-risk-value').className = 'screen-risk-value ' + level.toLowerCase();
             
             document.getElementById('risk-score').textContent = score.toFixed(2);
             document.getElementById('risk-score').style.color = 
-                level === 'SAFE' ? '#00ff88' : 
-                level === 'CAUTION' ? '#ffff00' : 
-                level === 'DANGER' ? '#ff8800' : '#ff0044';
+                level === 'SAFE' ? '#00ff88' : level === 'CAUTION' ? '#ffff00' : level === 'DANGER' ? '#ff8800' : '#ff0044';
             
             const gauge = document.getElementById('risk-gauge');
             gauge.style.width = (score * 100) + '%';
@@ -996,7 +938,13 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
         
-        initScene();
+        // Three.js 로드 확인 후 초기화
+        if (typeof THREE !== 'undefined') {
+            initScene();
+        } else {
+            console.error('❌ Three.js 라이브러리 로드 실패');
+            document.getElementById('loading').textContent = '오류: Three.js 로드 실패';
+        }
     </script>
 </body>
 </html>
