@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HHJJ 인터랙티브 도어락 시뮬레이터</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0a0e27;
+            overflow: hidden;
+            color: white;
+        }
+        
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        #controls-guide {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #00ff88;
+            border-radius: 15px;
+            padding: 20px;
+            max-width: 350px;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.6);
+        }
+        
+        .guide-title {
+            color: #00ff88;
+            font-size: 1.4em;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+        
+        .control-item {
+            margin: 10px 0;
+            padding: 8px;
+            background: rgba(0, 255, 136, 0.1);
+            border-radius: 5px;
+            font-size: 0.95em;
+        }
+        
+        .key {
+            display: inline-block;
+            background: #00ff88;
+            color: #0a0e27;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        
+        #action-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #ffaa00;
+            border-radius: 15px;
+            padding: 20px;
+            max-width: 350px;
+            box-shadow: 0 0 30px rgba(255, 170, 0, 0.6);
+        }
+        
+        .action-title {
+            color: #ffaa00;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+        }
+        
+        .action-btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 2px solid;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            font-size: 0.95em;
+        }
+        
+        .action-btn.bell {
+            border-color: #00ff88;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.3);
+        }
+        
+        .action-btn.bell:hover {
+            background: rgba(0, 255, 136, 0.2);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.6);
+        }
+        
+        .action-btn.drill {
+            border-color: #ff8800;
+            box-shadow: 0 0 10px rgba(255, 136, 0, 0.3);
+        }
+        
+        .action-btn.drill:hover {
+            background: rgba(255, 136, 0, 0.2);
+            box-shadow: 0 0 20px rgba(255, 136, 0, 0.6);
+        }
+        
+        .action-btn.kick {
+            border-color: #ff0044;
+            box-shadow: 0 0 10px rgba(255, 0, 68, 0.3);
+        }
+        
+        .action-btn.kick:hover {
+            background: rgba(255, 0, 68, 0.2);
+            box-shadow: 0 0 20px rgba(255, 0, 68, 0.6);
+        }
+        
+        #status-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 3px solid;
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            min-width: 250px;
+            transition: all 0.3s;
+        }
+        
+        #status-panel.SAFE {
+            border-color: #00ff88;
+            box-shadow: 0 0 40px rgba(0, 255, 136, 0.8);
+        }
+        
+        #status-panel.CAUTION {
+            border-color: #ffff00;
+            box-shadow: 0 0 40px rgba(255, 255, 0, 0.8);
+        }
+        
+        #status-panel.DANGER {
+            border-color: #ff8800;
+            box-shadow: 0 0 40px rgba(255, 136, 0, 0.8);
+        }
+        
+        #status-panel.CRITICAL {
+            border-color: #ff0044;
+            box-shadow: 0 0 40px rgba(255, 0, 68, 0.8);
+            animation: shake 0.3s infinite;
+        }
+        
+        .status-level {
+            font-size: 2em;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        
+        .sensor-reading {
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+        
+        .sensor-label {
+            color: #aaa;
+            font-size: 0.8em;
+        }
+        
+        .sensor-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        
+        .response-box {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(255, 0, 68, 0.2);
+            border: 2px solid #ff0044;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        .response-box.show {
+            display: block;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-1deg); }
+            75% { transform: rotate(1deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .timer {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 4em;
+            font-weight: bold;
+            color: #00ff88;
+            text-shadow: 0 0 30px #00ff88;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    
+    <div id="controls-guide">
+        <div class="guide-title">🎮 조작 방법</div>
+        <div class="control-item">
+            <span class="key">W A S D</span> 이동
+        </div>
+        <div class="control-item">
+            <span class="key">마우스</span> 시점 회전
+        </div>
+        <div class="control-item">
+            <span class="key">Space</span> 점프
+        </div>
+        <div class="control-item">
+            <span class="key">Shift</span> 달리기
+        </div>
+        <div style="margin-top: 15px; padding: 10px; background: rgba(255, 170, 0, 0.2); border-radius: 5px; font-size: 0.85em;">
+            💡 도어락에 가까이 가면 센서가 반응합니다!
+        </div>
+    </div>
+    
+    <div id="action-panel">
+        <div class="action-title">⚡ 행동</div>
+        <button class="action-btn bell" onclick="ringDoorbell()">
+            🔔 도어벨 누르기
+        </button>
+        <button class="action-btn drill" onclick="useDrill()">
+            🔨 드릴 사용 (3초 홀드)
+        </button>
+        <button class="action-btn kick" onclick="kickDoor()">
+            👟 문 차기 (강한 충격)
+        </button>
+        <button class="action-btn" onclick="openHousing()" style="border-color: #ff0044;">
+            🔓 외함 열기 (위험!)
+        </button>
+    </div>
+    
+    <div id="status-panel" class="SAFE">
+        <div class="status-level" id="threat-level">SAFE</div>
+        
+        <div class="sensor-reading">
+            <div class="sensor-label">거리 (ToF 센서)</div>
+            <div class="sensor-value" id="distance-display">300cm</div>
+        </div>
+        
+        <div class="sensor-reading">
+            <div class="sensor-label">체류 시간</div>
+            <div class="sensor-value" id="dwell-display">0초</div>
+        </div>
+        
+        <div class="sensor-reading">
+            <div class="sensor-label">진동 강도</div>
+            <div class="sensor-value" id="vibration-display">0.0g</div>
+        </div>
+        
+        <div class="sensor-reading">
+            <div class="sensor-label">음압 레벨</div>
+            <div class="sensor-value" id="audio-display">40dB</div>
+        </div>
+        
+        <div class="response-box" id="response-box">
+            🚨 자동 대응 활성화!
+            <div style="margin-top: 10px; font-size: 0.9em;">
+                <div id="response-actions"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="timer" id="timer"></div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Three.js 설정
+        let scene, camera, renderer, player, door, doorLock, sensors;
+        let clock = new THREE.Clock();
+        
+        // 플레이어 상태
+        let playerState = {
+            position: new THREE.Vector3(0, 1, 5),
+            velocity: new THREE.Vector3(0, 0, 0),
+            rotation: 0,
+            isJumping: false,
+            speed: 0.1,
+            sprintMultiplier: 2
+        };
+        
+        // 키 입력
+        let keys = {
+            w: false, a: false, s: false, d: false,
+            space: false, shift: false
+        };
+        
+        // 센서 데이터
+        let sensorData = {
+            distance: 300,
+            dwellTime: 0,
+            dwellStartTime: null,
+            vibration: 0,
+            audio: 40,
+            housingOpen: false
+        };
+        
+        // 씬 초기화
+        function initScene() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0e27);
+            scene.fog = new THREE.Fog(0x0a0e27, 1, 50);
+            
+            // 1인칭 카메라
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.copy(playerState.position);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+            
+            // 조명
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+            
+            const spotLight = new THREE.SpotLight(0xffffff, 1);
+            spotLight.position.set(0, 10, 0);
+            spotLight.castShadow = true;
+            scene.add(spotLight);
+            
+            // 바닥 (그리드)
+            const gridHelper = new THREE.GridHelper(50, 50, 0x00ff88, 0x003344);
+            scene.add(gridHelper);
+            
+            // 벽 (현관)
+            const wallGeometry = new THREE.BoxGeometry(10, 5, 0.2);
+            const wallMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x1a1a2e,
+                metalness: 0.5,
+                roughness: 0.5
+            });
+            const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+            wall.position.set(0, 2.5, -3);
+            wall.receiveShadow = true;
+            scene.add(wall);
+            
+            // 문
+            const doorGeometry = new THREE.BoxGeometry(1.5, 3, 0.15);
+            const doorMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x2a2a3e,
+                metalness: 0.7,
+                roughness: 0.3
+            });
+            door = new THREE.Mesh(doorGeometry, doorMaterial);
+            door.position.set(0, 1.5, -2.9);
+            door.castShadow = true;
+            scene.add(door);
+            
+            // 도어락
+            const lockGeometry = new THREE.BoxGeometry(0.3, 0.5, 0.15);
+            const lockMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x00ff88,
+                metalness: 0.9,
+                roughness: 0.1,
+                emissive: 0x00ff88,
+                emissiveIntensity: 0.5
+            });
+            doorLock = new THREE.Mesh(lockGeometry, lockMaterial);
+            doorLock.position.set(0.6, 1.5, -2.85);
+            scene.add(doorLock);
+            
+            // ToF 센서 (3개)
+            sensors = new THREE.Group();
+            for (let i = 0; i < 3; i++) {
+                const sensorGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.1);
+                const sensorMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x00ff88,
+                    emissive: 0x00ff88,
+                    emissiveIntensity: 1.0
+                });
+                const sensor = new THREE.Mesh(sensorGeometry, sensorMaterial);
+                sensor.position.set((i - 1) * 0.3, 0.5, -2.8);
+                sensor.rotation.x = Math.PI / 2;
+                sensors.add(sensor);
+            }
+            scene.add(sensors);
+            
+            // 플레이어 바디 (보이는 손)
+            const handGeometry = new THREE.BoxGeometry(0.2, 0.1, 0.3);
+            const handMaterial = new THREE.MeshStandardMaterial({ color: 0xffcc99 });
+            player = new THREE.Mesh(handGeometry, handMaterial);
+            player.position.set(0.3, -0.3, -0.5);
+            camera.add(player);
+            scene.add(camera);
+            
+            // 이벤트 리스너
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('click', () => {
+                renderer.domElement.requestPointerLock();
+            });
+            
+            animate();
+            updateSensors();
+        }
+        
+        function onKeyDown(e) {
+            if (e.key === 'w' || e.key === 'W') keys.w = true;
+            if (e.key === 'a' || e.key === 'A') keys.a = true;
+            if (e.key === 's' || e.key === 'S') keys.s = true;
+            if (e.key === 'd' || e.key === 'D') keys.d = true;
+            if (e.key === ' ') keys.space = true;
+            if (e.key === 'Shift') keys.shift = true;
+        }
+        
+        function onKeyUp(e) {
+            if (e.key === 'w' || e.key === 'W') keys.w = false;
+            if (e.key === 'a' || e.key === 'A') keys.a = false;
+            if (e.key === 's' || e.key === 'S') keys.s = false;
+            if (e.key === 'd' || e.key === 'D') keys.d = false;
+            if (e.key === ' ') keys.space = false;
+            if (e.key === 'Shift') keys.shift = false;
+        }
+        
+        function onMouseMove(e) {
+            if (document.pointerLockElement === renderer.domElement) {
+                playerState.rotation -= e.movementX * 0.002;
+                camera.rotation.y = playerState.rotation;
+                
+                camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, 
+                    camera.rotation.x - e.movementY * 0.002));
+            }
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const delta = clock.getDelta();
+            
+            // 플레이어 이동
+            const speed = keys.shift ? playerState.speed * playerState.sprintMultiplier : playerState.speed;
+            
+            if (keys.w) {
+                camera.position.x -= Math.sin(playerState.rotation) * speed;
+                camera.position.z -= Math.cos(playerState.rotation) * speed;
+            }
+            if (keys.s) {
+                camera.position.x += Math.sin(playerState.rotation) * speed;
+                camera.position.z += Math.cos(playerState.rotation) * speed;
+            }
+            if (keys.a) {
+                camera.position.x -= Math.cos(playerState.rotation) * speed;
+                camera.position.z += Math.sin(playerState.rotation) * speed;
+            }
+            if (keys.d) {
+                camera.position.x += Math.cos(playerState.rotation) * speed;
+                camera.position.z -= Math.sin(playerState.rotation) * speed;
+            }
+            
+            // 점프
+            if (keys.space && !playerState.isJumping) {
+                playerState.velocity.y = 0.15;
+                playerState.isJumping = true;
+            }
+            
+            // 중력
+            camera.position.y += playerState.velocity.y;
+            playerState.velocity.y -= 0.01;
+            
+            if (camera.position.y <= 1.6) {
+                camera.position.y = 1.6;
+                playerState.velocity.y = 0;
+                playerState.isJumping = false;
+            }
+            
+            // 경계 제한
+            camera.position.x = Math.max(-8, Math.min(8, camera.position.x));
+            camera.position.z = Math.max(-2.5, Math.min(10, camera.position.z));
+            
+            // 센서 애니메이션
+            sensors.children.forEach((sensor, i) => {
+                sensor.material.emissiveIntensity = 0.5 + Math.sin(Date.now() * 0.003 + i * 2) * 0.5;
+            });
+            
+            // 위협 레벨에 따른 도어락 반응
+            const threat = getThreatLevel();
+            updateDoorLock(threat);
+            
+            renderer.render(scene, camera);
+        }
+        
+        function updateSensors() {
+            setInterval(() => {
+                // 거리 계산 (도어락까지)
+                const doorPosition = new THREE.Vector3(0.6, 1.5, -2.85);
+                sensorData.distance = Math.round(camera.position.distanceTo(doorPosition) * 100);
+                
+                // 체류 시간 계산
+                if (sensorData.distance < 150) {
+                    if (sensorData.dwellStartTime === null) {
+                        sensorData.dwellStartTime = Date.now();
+                    }
+                    sensorData.dwellTime = Math.floor((Date.now() - sensorData.dwellStartTime) / 1000);
+                } else {
+                    sensorData.dwellStartTime = null;
+                    sensorData.dwellTime = 0;
+                }
+                
+                // 진동 감쇠
+                sensorData.vibration = Math.max(0, sensorData.vibration - 0.5);
+                
+                // 음압 감쇠
+                sensorData.audio = Math.max(40, sensorData.audio - 5);
+                
+                updateUI();
+            }, 100);
+        }
+        
+        function getThreatLevel() {
+            let d = Math.max(0, (300 - sensorData.distance) / 300);
+            let t = Math.min(sensorData.dwellTime / 120, 1);
+            let v = Math.min(sensorData.vibration / 10, 1);
+            let a = Math.min(Math.max((sensorData.audio - 40) / 80, 0), 1);
+            let h = sensorData.housingOpen ? 1 : 0;
+            
+            let score = d * 0.25 + t * 0.25 + v * 0.20 + a * 0.15 + h * 0.15;
+            
+            if (score < 0.3) return 'SAFE';
+            if (score < 0.6) return 'CAUTION';
+            if (score < 0.85) return 'DANGER';
+            return 'CRITICAL';
+        }
+        
+        function updateDoorLock(threat) {
+            if (threat === 'SAFE') {
+                doorLock.material.color.setHex(0x00ff88);
+                doorLock.material.emissive.setHex(0x00ff88);
+                doorLock.material.emissiveIntensity = 0.5;
+            } else if (threat === 'CAUTION') {
+                doorLock.material.color.setHex(0xffff00);
+                doorLock.material.emissive.setHex(0xffff00);
+                doorLock.material.emissiveIntensity = 0.7;
+            } else if (threat === 'DANGER') {
+                doorLock.material.color.setHex(0xff8800);
+                doorLock.material.emissive.setHex(0xff8800);
+                doorLock.material.emissiveIntensity = 0.9;
+                door.rotation.y = Math.sin(Date.now() * 0.01) * 0.03;
+            } else {
+                doorLock.material.color.setHex(0xff0044);
+                doorLock.material.emissive.setHex(0xff0044);
+                doorLock.material.emissiveIntensity = 1.2;
+                door.rotation.y = Math.sin(Date.now() * 0.02) * 0.08;
+                doorLock.position.x = 0.6 + Math.sin(Date.now() * 0.05) * 0.05;
+            }
+        }
+        
+        function updateUI() {
+            document.getElementById('distance-display').textContent = sensorData.distance + 'cm';
+            document.getElementById('dwell-display').textContent = sensorData.dwellTime + '초';
+            document.getElementById('vibration-display').textContent = sensorData.vibration.toFixed(1) + 'g';
+            document.getElementById('audio-display').textContent = Math.round(sensorData.audio) + 'dB';
+            
+            const threat = getThreatLevel();
+            const panel = document.getElementById('status-panel');
+            panel.className = threat;
+            document.getElementById('threat-level').textContent = threat;
+            
+            // 자동 대응 표시
+            const responseBox = document.getElementById('response-box');
+            const responseActions = document.getElementById('response-actions');
+            
+            if (threat === 'DANGER' || threat === 'CRITICAL') {
+                responseBox.classList.add('show');
+                let actions = [];
+                
+                if (threat === 'DANGER') {
+                    actions = ['📱 사용자 긴급 알림', '📹 고화질 녹화', '🔒 잠금 강화'];
+                } else {
+                    actions = ['🚓 자동 경찰 신고', '🔐 비상 잠금', '📦 증거 전송', '🔊 사이렌'];
+                }
+                
+                responseActions.innerHTML = actions.map(a => `<div style="margin: 5px 0;">✓ ${a}</div>`).join('');
+            } else {
+                responseBox.classList.remove('show');
+            }
+        }
+        
+        // 행동 버튼
+        function ringDoorbell() {
+            sensorData.audio = 70;
+            showTimer('🔔');
+            console.log('도어벨 울림');
+        }
+        
+        function useDrill() {
+            let drillTime = 0;
+            const drillInterval = setInterval(() => {
+                drillTime++;
+                sensorData.vibration = 5 + Math.random() * 3;
+                sensorData.audio = 85 + Math.random() * 10;
+                showTimer(`🔨 ${drillTime}초`);
+                
+                if (drillTime >= 3) {
+                    clearInterval(drillInterval);
+                }
+            }, 1000);
+        }
+        
+        function kickDoor() {
+            sensorData.vibration = 8;
+            sensorData.audio = 95;
+            door.rotation.y = 0.2;
+            setTimeout(() => door.rotation.y = 0, 500);
+            showTimer('👟 KICK!');
+        }
+        
+        function openHousing() {
+            sensorData.housingOpen = true;
+            doorLock.scale.x = 1.5;
+            showTimer('🔓 외함 개방!');
+            setTimeout(() => {
+                sensorData.housingOpen = false;
+                doorLock.scale.x = 1;
+            }, 5000);
+        }
+        
+        function showTimer(text) {
+            const timer = document.getElementById('timer');
+            timer.textContent = text;
+            timer.style.opacity = '1';
+            setTimeout(() => timer.style.opacity = '0', 2000);
+        }
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        initScene();
+    </script>
+</body>
+</html>
