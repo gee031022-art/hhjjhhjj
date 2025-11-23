@@ -113,32 +113,14 @@
             font-size: 0.9em;
         }
         
-        .action-btn.bell {
-            border-color: #00ff88;
-        }
+        .action-btn.bell { border-color: #00ff88; }
+        .action-btn.bell:hover { background: rgba(0, 255, 136, 0.2); box-shadow: 0 0 20px rgba(0, 255, 136, 0.6); }
         
-        .action-btn.bell:hover {
-            background: rgba(0, 255, 136, 0.2);
-            box-shadow: 0 0 20px rgba(0, 255, 136, 0.6);
-        }
+        .action-btn.drill { border-color: #ff8800; }
+        .action-btn.drill:hover { background: rgba(255, 136, 0, 0.2); box-shadow: 0 0 20px rgba(255, 136, 0, 0.6); }
         
-        .action-btn.drill {
-            border-color: #ff8800;
-        }
-        
-        .action-btn.drill:hover {
-            background: rgba(255, 136, 0, 0.2);
-            box-shadow: 0 0 20px rgba(255, 136, 0, 0.6);
-        }
-        
-        .action-btn.kick {
-            border-color: #ff0044;
-        }
-        
-        .action-btn.kick:hover {
-            background: rgba(255, 0, 68, 0.2);
-            box-shadow: 0 0 20px rgba(255, 0, 68, 0.6);
-        }
+        .action-btn.kick { border-color: #ff0044; }
+        .action-btn.kick:hover { background: rgba(255, 0, 68, 0.2); box-shadow: 0 0 20px rgba(255, 0, 68, 0.6); }
         
         #status-panel {
             position: fixed;
@@ -259,17 +241,6 @@
             height: 100%;
             transition: width 0.2s;
             border-radius: 3px;
-        }
-        
-        .sensor-reading {
-            margin: 10px 0;
-            padding: 8px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 8px;
-            font-size: 0.85em;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 6px;
         }
         
         .sensor-value {
@@ -490,13 +461,12 @@
         
         let keys = {};
         
-        // ✅ 센서 데이터 - 누적식 (상한선 없음!)
         let sensorData = {
             distance: 300,
             dwellTime: 0,
             dwellStartTime: null,
-            vibration: 0,        // 무제한 누적
-            audio: 40,            // 무제한 누적
+            vibration: 0,
+            audio: 40,
             housingOpen: false,
             loiteringScore: 0,
             positionHistory: [],
@@ -653,7 +623,6 @@
                 
                 detectLoitering();
                 
-                // ✅ 천천한 감쇠 (누적 효과 유지)
                 sensorData.vibration = Math.max(0, sensorData.vibration - 0.02);
                 sensorData.audio = Math.max(40, sensorData.audio - 0.5);
                 
@@ -697,28 +666,32 @@
             }
         }
         
-        // ✅ 핵심: 누적식 위험도 계산 (상한선 없음!)
+        // ✅ FIX: min() 제한 제거! (무한 누적 가능)
         function getThreatLevel() {
             let d = Math.max(0, (300 - sensorData.distance) / 300);
             let t = Math.min(sensorData.dwellTime / 30, 1);
             let l = sensorData.loiteringScore;
             
-            // ✅ 진동/음압: 누적값 그대로 사용 (무제한 가능)
-            let v = Math.min(sensorData.vibration / 20, 1.0);  // 20 = 정규화 기준
-            let a = Math.min((sensorData.audio - 40) / 100, 1.0);  // 100 = 정규화 기준
+            // ✅ 변경: min() 없이 직접 사용 (기여도가 1.0 이상도 가능!)
+            let v = sensorData.vibration / 20;       // 무제한 누적
+            let a = (sensorData.audio - 40) / 100;   // 무제한 누적
             
             let h = sensorData.housingOpen ? 1 : 0;
             
-            // ✅ 최종 위험도 = 누적식 합산
+            // ✅ 최종 위험도 = 누적식 합산 (1.0 이상 가능!)
             let score = d * 0.20 + t * 0.20 + l * 0.20 + v * 0.20 + a * 0.15 + h * 0.05;
             
-            // console.log(`D:${(d*0.20).toFixed(3)} T:${(t*0.20).toFixed(3)} L:${(l*0.20).toFixed(3)} V:${(v*0.20).toFixed(3)} A:${(a*0.15).toFixed(3)} = ${score.toFixed(3)}`);
-            
             return {
-                score: Math.min(score, 1.0),  // 최대 1.0으로 표시
-                actualScore: score,  // 실제 누적값
+                score: score,  // 실제 누적값 (1.0 이상도 가능)
                 level: score < 0.3 ? 'SAFE' : score < 0.6 ? 'CAUTION' : score < 0.85 ? 'DANGER' : 'CRITICAL',
-                contributions: { d: d * 0.20, t: t * 0.20, l: l * 0.20, v: v * 0.20, a: a * 0.15, h: h * 0.05 }
+                contributions: { 
+                    d: d * 0.20, 
+                    t: t * 0.20, 
+                    l: l * 0.20, 
+                    v: v * 0.20, 
+                    a: a * 0.15, 
+                    h: h * 0.05 
+                }
             };
         }
         
@@ -744,39 +717,41 @@
         
         function updateUI() {
             const threat = getThreatLevel();
-            const { score, actualScore, level, contributions } = threat;
+            const { score, level, contributions } = threat;
             
-            document.getElementById('risk-score').textContent = actualScore.toFixed(2);
+            // 위험도 표시 (1.0 이상도 표시됨)
+            document.getElementById('risk-score').textContent = score.toFixed(2);
             document.getElementById('risk-score').style.color = 
                 level === 'SAFE' ? '#00ff88' : level === 'CAUTION' ? '#ffff00' : level === 'DANGER' ? '#ff8800' : '#ff0044';
             
+            // 게이지 (최대 100%)
             const gauge = document.getElementById('risk-gauge');
             gauge.style.width = Math.min(score * 100, 100) + '%';
             gauge.className = 'risk-gauge-fill ' + level.toLowerCase();
             
             document.getElementById('distance-raw').textContent = sensorData.distance + 'cm';
             document.getElementById('distance-contrib').textContent = contributions.d.toFixed(3);
-            document.getElementById('distance-bar').style.width = (Math.max(contributions.d, 0) * 500) + '%';
+            document.getElementById('distance-bar').style.width = (Math.min(contributions.d * 500, 100)) + '%';
             
             document.getElementById('dwell-raw').textContent = sensorData.dwellTime + '초';
             document.getElementById('dwell-contrib').textContent = contributions.t.toFixed(3);
-            document.getElementById('dwell-bar').style.width = (Math.max(contributions.t, 0) * 500) + '%';
+            document.getElementById('dwell-bar').style.width = (Math.min(contributions.t * 500, 100)) + '%';
             
             document.getElementById('loiter-raw').textContent = sensorData.directionChanges + '회';
             document.getElementById('loiter-contrib').textContent = contributions.l.toFixed(3);
-            document.getElementById('loiter-bar').style.width = (Math.max(contributions.l, 0) * 500) + '%';
+            document.getElementById('loiter-bar').style.width = (Math.min(contributions.l * 500, 100)) + '%';
             
             document.getElementById('vibration-raw').textContent = sensorData.vibration.toFixed(1);
             document.getElementById('vibration-contrib').textContent = contributions.v.toFixed(3);
-            document.getElementById('vibration-bar').style.width = (Math.max(contributions.v, 0) * 500) + '%';
+            document.getElementById('vibration-bar').style.width = (Math.min(contributions.v * 500, 100)) + '%';
             
             document.getElementById('audio-raw').textContent = Math.round(sensorData.audio) + 'dB';
             document.getElementById('audio-contrib').textContent = contributions.a.toFixed(3);
-            document.getElementById('audio-bar').style.width = (Math.max(contributions.a, 0) * 666) + '%';
+            document.getElementById('audio-bar').style.width = (Math.min(contributions.a * 666, 100)) + '%';
             
             document.getElementById('housing-raw').textContent = sensorData.housingOpen ? '개방!' : '정상';
             document.getElementById('housing-contrib').textContent = contributions.h.toFixed(3);
-            document.getElementById('housing-bar').style.width = (Math.max(contributions.h, 0) * 2000) + '%';
+            document.getElementById('housing-bar').style.width = (Math.min(contributions.h * 2000, 100)) + '%';
             
             const panel = document.getElementById('status-panel');
             panel.className = level;
@@ -795,7 +770,6 @@
             }
         }
         
-        // ✅ 드릴 - 무제한 누적
         function useDrill() {
             const btn = document.getElementById('drill-btn');
             if (isDrillingActive) {
@@ -812,7 +786,7 @@
                     clearInterval(interval);
                     return;
                 }
-                sensorData.vibration += 2;  // 계속 누적 (상한선 없음!)
+                sensorData.vibration += 2;
             }, 300);
         }
         
