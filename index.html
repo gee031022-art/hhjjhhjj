@@ -134,8 +134,7 @@
             border: 3px solid;
             border-radius: 15px;
             padding: 25px;
-            text-align: center;
-            min-width: 250px;
+            min-width: 320px;
             transition: all 0.3s;
         }
         
@@ -164,22 +163,146 @@
             font-size: 2em;
             font-weight: bold;
             margin-bottom: 15px;
+            text-align: center;
         }
         
-        .sensor-reading {
-            margin: 10px 0;
-            padding: 10px;
+        /* 위험 수치 게이지 */
+        .risk-score-container {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .risk-score-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        
+        .risk-score-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #00ff88;
+        }
+        
+        .risk-gauge {
+            position: relative;
+            height: 30px;
             background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        
+        .risk-gauge-fill {
+            height: 100%;
+            transition: width 0.3s, background 0.3s;
+            border-radius: 15px;
+            position: relative;
+            box-shadow: 0 0 20px currentColor;
+        }
+        
+        .risk-gauge-fill.safe {
+            background: linear-gradient(90deg, #00ff88, #00ddaa);
+        }
+        
+        .risk-gauge-fill.caution {
+            background: linear-gradient(90deg, #ffff00, #ffaa00);
+        }
+        
+        .risk-gauge-fill.danger {
+            background: linear-gradient(90deg, #ff8800, #ff4400);
+        }
+        
+        .risk-gauge-fill.critical {
+            background: linear-gradient(90deg, #ff0044, #aa0022);
+            animation: pulse-gauge 1s infinite;
+        }
+        
+        @keyframes pulse-gauge {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .risk-markers {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75em;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        .risk-marker {
+            position: relative;
+        }
+        
+        .risk-marker::before {
+            content: '';
+            position: absolute;
+            top: -35px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 30px;
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        /* 센서별 수치 표시 */
+        .sensor-breakdown {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .sensor-item {
+            margin: 10px 0;
+        }
+        
+        .sensor-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
             font-size: 0.9em;
         }
         
         .sensor-label {
             color: #aaa;
-            font-size: 0.8em;
         }
         
         .sensor-value {
+            font-weight: bold;
+        }
+        
+        .sensor-bar {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .sensor-bar-fill {
+            height: 100%;
+            transition: width 0.3s, background 0.3s;
+            border-radius: 4px;
+        }
+        
+        .sensor-reading {
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+        
+        .sensor-label-alt {
+            color: #aaa;
+            font-size: 0.8em;
+        }
+        
+        .sensor-value-alt {
             font-size: 1.3em;
             font-weight: bold;
             margin-top: 5px;
@@ -220,6 +343,8 @@
             color: #00ff88;
             text-shadow: 0 0 30px #00ff88;
             pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
         }
     </style>
 </head>
@@ -251,37 +376,112 @@
             🔔 도어벨 누르기
         </button>
         <button class="action-btn drill" onclick="useDrill()">
-            🔨 드릴 사용 (3초 홀드)
+            🔨 드릴 사용 (3초)
         </button>
         <button class="action-btn kick" onclick="kickDoor()">
-            👟 문 차기 (강한 충격)
+            👟 문 차기
         </button>
         <button class="action-btn" onclick="openHousing()" style="border-color: #ff0044;">
-            🔓 외함 열기 (위험!)
+            🔓 외함 열기
         </button>
     </div>
     
     <div id="status-panel" class="SAFE">
         <div class="status-level" id="threat-level">SAFE</div>
         
-        <div class="sensor-reading">
-            <div class="sensor-label">거리 (ToF 센서)</div>
-            <div class="sensor-value" id="distance-display">300cm</div>
+        <!-- 위험 수치 게이지 -->
+        <div class="risk-score-container">
+            <div class="risk-score-label">
+                <span>위험 수치</span>
+                <span class="risk-score-value" id="risk-score">0.0</span>
+            </div>
+            <div class="risk-gauge">
+                <div class="risk-gauge-fill safe" id="risk-gauge" style="width: 0%;"></div>
+            </div>
+            <div class="risk-markers">
+                <div class="risk-marker">0.0<br>안전</div>
+                <div class="risk-marker">0.3<br>주의</div>
+                <div class="risk-marker">0.6<br>위험</div>
+                <div class="risk-marker">0.85<br>치명</div>
+                <div class="risk-marker">1.0</div>
+            </div>
         </div>
         
-        <div class="sensor-reading">
-            <div class="sensor-label">체류 시간</div>
-            <div class="sensor-value" id="dwell-display">0초</div>
+        <!-- 센서별 기여도 -->
+        <div class="sensor-breakdown">
+            <div style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">📊 센서별 기여도</div>
+            
+            <div class="sensor-item">
+                <div class="sensor-header">
+                    <span class="sensor-label">거리 (25%)</span>
+                    <span class="sensor-value" id="distance-contribution">0.00</span>
+                </div>
+                <div class="sensor-bar">
+                    <div class="sensor-bar-fill" id="distance-bar" style="background: #00ff88; width: 0%;"></div>
+                </div>
+            </div>
+            
+            <div class="sensor-item">
+                <div class="sensor-header">
+                    <span class="sensor-label">체류시간 (25%)</span>
+                    <span class="sensor-value" id="dwell-contribution">0.00</span>
+                </div>
+                <div class="sensor-bar">
+                    <div class="sensor-bar-fill" id="dwell-bar" style="background: #ffaa00; width: 0%;"></div>
+                </div>
+            </div>
+            
+            <div class="sensor-item">
+                <div class="sensor-header">
+                    <span class="sensor-label">진동 (20%)</span>
+                    <span class="sensor-value" id="vibration-contribution">0.00</span>
+                </div>
+                <div class="sensor-bar">
+                    <div class="sensor-bar-fill" id="vibration-bar" style="background: #ff8800; width: 0%;"></div>
+                </div>
+            </div>
+            
+            <div class="sensor-item">
+                <div class="sensor-header">
+                    <span class="sensor-label">음압 (15%)</span>
+                    <span class="sensor-value" id="audio-contribution">0.00</span>
+                </div>
+                <div class="sensor-bar">
+                    <div class="sensor-bar-fill" id="audio-bar" style="background: #ff4400; width: 0%;"></div>
+                </div>
+            </div>
+            
+            <div class="sensor-item">
+                <div class="sensor-header">
+                    <span class="sensor-label">외함 (15%)</span>
+                    <span class="sensor-value" id="housing-contribution">0.00</span>
+                </div>
+                <div class="sensor-bar">
+                    <div class="sensor-bar-fill" id="housing-bar" style="background: #ff0044; width: 0%;"></div>
+                </div>
+            </div>
         </div>
         
-        <div class="sensor-reading">
-            <div class="sensor-label">진동 강도</div>
-            <div class="sensor-value" id="vibration-display">0.0g</div>
-        </div>
-        
-        <div class="sensor-reading">
-            <div class="sensor-label">음압 레벨</div>
-            <div class="sensor-value" id="audio-display">40dB</div>
+        <div class="sensor-reading" style="margin-top: 15px;">
+            <div class="sensor-label-alt">실제 센서 값</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                <div>
+                    <div style="font-size: 0.75em; color: #888;">거리</div>
+                    <div id="distance-display" style="font-size: 1.1em; font-weight: bold;">300cm</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.75em; color: #888;">체류</div>
+                    <div id="dwell-display" style="font-size: 1.1em; font-weight: bold;">0초</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.75em; color: #888;">진동</div>
+                    <div id="vibration-display" style="font-size: 1.1em; font-weight: bold;">0.0g</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.75em; color: #888;">음압</div>
+                    <div id="audio-display" style="font-size: 1.1em; font-weight: bold;">40dB</div>
+                </div>
+            </div>
         </div>
         
         <div class="response-box" id="response-box">
@@ -332,7 +532,6 @@
             scene.background = new THREE.Color(0x0a0e27);
             scene.fog = new THREE.Fog(0x0a0e27, 1, 50);
             
-            // 1인칭 카메라
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.copy(playerState.position);
             
@@ -341,7 +540,6 @@
             renderer.shadowMap.enabled = true;
             document.getElementById('canvas-container').appendChild(renderer.domElement);
             
-            // 조명
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
             scene.add(ambientLight);
             
@@ -350,11 +548,9 @@
             spotLight.castShadow = true;
             scene.add(spotLight);
             
-            // 바닥 (그리드)
             const gridHelper = new THREE.GridHelper(50, 50, 0x00ff88, 0x003344);
             scene.add(gridHelper);
             
-            // 벽 (현관)
             const wallGeometry = new THREE.BoxGeometry(10, 5, 0.2);
             const wallMaterial = new THREE.MeshStandardMaterial({ 
                 color: 0x1a1a2e,
@@ -366,7 +562,6 @@
             wall.receiveShadow = true;
             scene.add(wall);
             
-            // 문
             const doorGeometry = new THREE.BoxGeometry(1.5, 3, 0.15);
             const doorMaterial = new THREE.MeshStandardMaterial({ 
                 color: 0x2a2a3e,
@@ -378,7 +573,6 @@
             door.castShadow = true;
             scene.add(door);
             
-            // 도어락
             const lockGeometry = new THREE.BoxGeometry(0.3, 0.5, 0.15);
             const lockMaterial = new THREE.MeshStandardMaterial({ 
                 color: 0x00ff88,
@@ -391,7 +585,6 @@
             doorLock.position.set(0.6, 1.5, -2.85);
             scene.add(doorLock);
             
-            // ToF 센서 (3개)
             sensors = new THREE.Group();
             for (let i = 0; i < 3; i++) {
                 const sensorGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.1);
@@ -407,7 +600,6 @@
             }
             scene.add(sensors);
             
-            // 플레이어 바디 (보이는 손)
             const handGeometry = new THREE.BoxGeometry(0.2, 0.1, 0.3);
             const handMaterial = new THREE.MeshStandardMaterial({ color: 0xffcc99 });
             player = new THREE.Mesh(handGeometry, handMaterial);
@@ -415,7 +607,6 @@
             camera.add(player);
             scene.add(camera);
             
-            // 이벤트 리스너
             document.addEventListener('keydown', onKeyDown);
             document.addEventListener('keyup', onKeyUp);
             document.addEventListener('mousemove', onMouseMove);
@@ -449,7 +640,6 @@
             if (document.pointerLockElement === renderer.domElement) {
                 playerState.rotation -= e.movementX * 0.002;
                 camera.rotation.y = playerState.rotation;
-                
                 camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, 
                     camera.rotation.x - e.movementY * 0.002));
             }
@@ -458,9 +648,6 @@
         function animate() {
             requestAnimationFrame(animate);
             
-            const delta = clock.getDelta();
-            
-            // 플레이어 이동
             const speed = keys.shift ? playerState.speed * playerState.sprintMultiplier : playerState.speed;
             
             if (keys.w) {
@@ -480,13 +667,11 @@
                 camera.position.z -= Math.sin(playerState.rotation) * speed;
             }
             
-            // 점프
             if (keys.space && !playerState.isJumping) {
                 playerState.velocity.y = 0.15;
                 playerState.isJumping = true;
             }
             
-            // 중력
             camera.position.y += playerState.velocity.y;
             playerState.velocity.y -= 0.01;
             
@@ -496,16 +681,13 @@
                 playerState.isJumping = false;
             }
             
-            // 경계 제한
             camera.position.x = Math.max(-8, Math.min(8, camera.position.x));
             camera.position.z = Math.max(-2.5, Math.min(10, camera.position.z));
             
-            // 센서 애니메이션
             sensors.children.forEach((sensor, i) => {
                 sensor.material.emissiveIntensity = 0.5 + Math.sin(Date.now() * 0.003 + i * 2) * 0.5;
             });
             
-            // 위협 레벨에 따른 도어락 반응
             const threat = getThreatLevel();
             updateDoorLock(threat);
             
@@ -514,11 +696,9 @@
         
         function updateSensors() {
             setInterval(() => {
-                // 거리 계산 (도어락까지)
                 const doorPosition = new THREE.Vector3(0.6, 1.5, -2.85);
                 sensorData.distance = Math.round(camera.position.distanceTo(doorPosition) * 100);
                 
-                // 체류 시간 계산
                 if (sensorData.distance < 150) {
                     if (sensorData.dwellStartTime === null) {
                         sensorData.dwellStartTime = Date.now();
@@ -529,10 +709,7 @@
                     sensorData.dwellTime = 0;
                 }
                 
-                // 진동 감쇠
                 sensorData.vibration = Math.max(0, sensorData.vibration - 0.5);
-                
-                // 음압 감쇠
                 sensorData.audio = Math.max(40, sensorData.audio - 5);
                 
                 updateUI();
@@ -548,22 +725,31 @@
             
             let score = d * 0.25 + t * 0.25 + v * 0.20 + a * 0.15 + h * 0.15;
             
-            if (score < 0.3) return 'SAFE';
-            if (score < 0.6) return 'CAUTION';
-            if (score < 0.85) return 'DANGER';
-            return 'CRITICAL';
+            return {
+                score: score,
+                level: score < 0.3 ? 'SAFE' : score < 0.6 ? 'CAUTION' : score < 0.85 ? 'DANGER' : 'CRITICAL',
+                contributions: {
+                    distance: d * 0.25,
+                    dwell: t * 0.25,
+                    vibration: v * 0.20,
+                    audio: a * 0.15,
+                    housing: h * 0.15
+                }
+            };
         }
         
         function updateDoorLock(threat) {
-            if (threat === 'SAFE') {
+            const level = threat.level;
+            
+            if (level === 'SAFE') {
                 doorLock.material.color.setHex(0x00ff88);
                 doorLock.material.emissive.setHex(0x00ff88);
                 doorLock.material.emissiveIntensity = 0.5;
-            } else if (threat === 'CAUTION') {
+            } else if (level === 'CAUTION') {
                 doorLock.material.color.setHex(0xffff00);
                 doorLock.material.emissive.setHex(0xffff00);
                 doorLock.material.emissiveIntensity = 0.7;
-            } else if (threat === 'DANGER') {
+            } else if (level === 'DANGER') {
                 doorLock.material.color.setHex(0xff8800);
                 doorLock.material.emissive.setHex(0xff8800);
                 doorLock.material.emissiveIntensity = 0.9;
@@ -578,29 +764,59 @@
         }
         
         function updateUI() {
+            const threat = getThreatLevel();
+            const score = threat.score;
+            const level = threat.level;
+            const contrib = threat.contributions;
+            
+            // 위험 수치 표시
+            document.getElementById('risk-score').textContent = score.toFixed(2);
+            document.getElementById('risk-score').style.color = 
+                level === 'SAFE' ? '#00ff88' : 
+                level === 'CAUTION' ? '#ffff00' : 
+                level === 'DANGER' ? '#ff8800' : '#ff0044';
+            
+            // 게이지 업데이트
+            const gauge = document.getElementById('risk-gauge');
+            gauge.style.width = (score * 100) + '%';
+            gauge.className = 'risk-gauge-fill ' + level.toLowerCase();
+            
+            // 센서별 기여도
+            document.getElementById('distance-contribution').textContent = contrib.distance.toFixed(3);
+            document.getElementById('distance-bar').style.width = (contrib.distance * 400) + '%';
+            
+            document.getElementById('dwell-contribution').textContent = contrib.dwell.toFixed(3);
+            document.getElementById('dwell-bar').style.width = (contrib.dwell * 400) + '%';
+            
+            document.getElementById('vibration-contribution').textContent = contrib.vibration.toFixed(3);
+            document.getElementById('vibration-bar').style.width = (contrib.vibration * 500) + '%';
+            
+            document.getElementById('audio-contribution').textContent = contrib.audio.toFixed(3);
+            document.getElementById('audio-bar').style.width = (contrib.audio * 666) + '%';
+            
+            document.getElementById('housing-contribution').textContent = contrib.housing.toFixed(3);
+            document.getElementById('housing-bar').style.width = (contrib.housing * 666) + '%';
+            
+            // 실제 센서 값
             document.getElementById('distance-display').textContent = sensorData.distance + 'cm';
             document.getElementById('dwell-display').textContent = sensorData.dwellTime + '초';
             document.getElementById('vibration-display').textContent = sensorData.vibration.toFixed(1) + 'g';
             document.getElementById('audio-display').textContent = Math.round(sensorData.audio) + 'dB';
             
-            const threat = getThreatLevel();
+            // 위협 레벨
             const panel = document.getElementById('status-panel');
-            panel.className = threat;
-            document.getElementById('threat-level').textContent = threat;
+            panel.className = level;
+            document.getElementById('threat-level').textContent = level;
             
-            // 자동 대응 표시
+            // 자동 대응
             const responseBox = document.getElementById('response-box');
             const responseActions = document.getElementById('response-actions');
             
-            if (threat === 'DANGER' || threat === 'CRITICAL') {
+            if (level === 'DANGER' || level === 'CRITICAL') {
                 responseBox.classList.add('show');
-                let actions = [];
-                
-                if (threat === 'DANGER') {
-                    actions = ['📱 사용자 긴급 알림', '📹 고화질 녹화', '🔒 잠금 강화'];
-                } else {
-                    actions = ['🚓 자동 경찰 신고', '🔐 비상 잠금', '📦 증거 전송', '🔊 사이렌'];
-                }
+                let actions = level === 'DANGER' ? 
+                    ['📱 사용자 긴급 알림', '📹 고화질 녹화', '🔒 잠금 강화'] :
+                    ['🚓 자동 경찰 신고', '🔐 비상 잠금', '📦 증거 전송', '🔊 사이렌'];
                 
                 responseActions.innerHTML = actions.map(a => `<div style="margin: 5px 0;">✓ ${a}</div>`).join('');
             } else {
@@ -608,11 +824,9 @@
             }
         }
         
-        // 행동 버튼
         function ringDoorbell() {
             sensorData.audio = 70;
             showTimer('🔔');
-            console.log('도어벨 울림');
         }
         
         function useDrill() {
