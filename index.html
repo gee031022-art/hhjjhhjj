@@ -673,4 +673,330 @@
                 });
                 const sensor = new THREE.Mesh(sensorGeometry, sensorMaterial);
                 sensor.position.set((i - 1) * 0.3, 0.5, -2.8);
-                sensor.rotation
+                sensor.rotation.x = Math.PI / 2;
+                sensors.add(sensor);
+            }
+            scene.add(sensors);
+            
+            const handGeometry = new THREE.BoxGeometry(0.2, 0.1, 0.3);
+            const handMaterial = new THREE.MeshStandardMaterial({ color: 0xffcc99 });
+            player = new THREE.Mesh(handGeometry, handMaterial);
+            player.position.set(0.3, -0.3, -0.5);
+            camera.add(player);
+            scene.add(camera);
+            
+            // 이벤트 리스너
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            
+            // 마우스 이벤트 (우클릭으로 시점 회전)
+            renderer.domElement.addEventListener('mousedown', onMouseDown);
+            renderer.domElement.addEventListener('mouseup', onMouseUp);
+            renderer.domElement.addEventListener('mousemove', onMouseMove);
+            renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+            
+            animate();
+            updateSensors();
+        }
+        
+        function onMouseDown(e) {
+            if (e.button === 2) { // 우클릭
+                isRightMouseDown = true;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+                updateMouseMode();
+                renderer.domElement.style.cursor = 'grabbing';
+            }
+        }
+        
+        function onMouseUp(e) {
+            if (e.button === 2) { // 우클릭
+                isRightMouseDown = false;
+                updateMouseMode();
+                renderer.domElement.style.cursor = 'default';
+            }
+        }
+        
+        function onMouseMove(e) {
+            if (isRightMouseDown) {
+                const deltaX = e.clientX - lastMouseX;
+                const deltaY = e.clientY - lastMouseY;
+                
+                // 좌우 회전 (yaw)
+                playerState.rotation -= deltaX * 0.003;
+                
+                // 상하 회전 (pitch)
+                playerState.pitch -= deltaY * 0.003;
+                playerState.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, playerState.pitch));
+                
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+            }
+        }
+        
+        function updateMouseMode() {
+            const indicator = document.getElementById('mouse-mode-indicator');
+            if (isRightMouseDown) {
+                indicator.textContent = '🎥 시점 회전 모드';
+                indicator.className = 'view-mode';
+            } else {
+                indicator.textContent = '🖱️ 커서 모드';
+                indicator.className = 'cursor-mode';
+            }
+        }
+        
+        function onKeyDown(e) {
+            if (e.key === 'w' || e.key === 'W') keys.w = true;
+            if (e.key === 'a' || e.key === 'A') keys.a = true;
+            if (e.key === 's' || e.key === 'S') keys.s = true;
+            if (e.key === 'd' || e.key === 'D') keys.d = true;
+            if (e.key === ' ') keys.space = true;
+            if (e.key === 'Shift') keys.shift = true;
+        }
+        
+        function onKeyUp(e) {
+            if (e.key === 'w' || e.key === 'W') keys.w = false;
+            if (e.key === 'a' || e.key === 'A') keys.a = false;
+            if (e.key === 's' || e.key === 'S') keys.s = false;
+            if (e.key === 'd' || e.key === 'D') keys.d = false;
+            if (e.key === ' ') keys.space = false;
+            if (e.key === 'Shift') keys.shift = false;
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const speed = keys.shift ? playerState.speed * playerState.sprintMultiplier : playerState.speed;
+            
+            if (keys.w) {
+                camera.position.x -= Math.sin(playerState.rotation) * speed;
+                camera.position.z -= Math.cos(playerState.rotation) * speed;
+            }
+            if (keys.s) {
+                camera.position.x += Math.sin(playerState.rotation) * speed;
+                camera.position.z += Math.cos(playerState.rotation) * speed;
+            }
+            if (keys.a) {
+                camera.position.x -= Math.cos(playerState.rotation) * speed;
+                camera.position.z += Math.sin(playerState.rotation) * speed;
+            }
+            if (keys.d) {
+                camera.position.x += Math.cos(playerState.rotation) * speed;
+                camera.position.z -= Math.sin(playerState.rotation) * speed;
+            }
+            
+            if (keys.space && !playerState.isJumping) {
+                playerState.velocity.y = 0.15;
+                playerState.isJumping = true;
+            }
+            
+            camera.position.y += playerState.velocity.y;
+            playerState.velocity.y -= 0.01;
+            
+            if (camera.position.y <= 1.6) {
+                camera.position.y = 1.6;
+                playerState.velocity.y = 0;
+                playerState.isJumping = false;
+            }
+            
+            camera.position.x = Math.max(-8, Math.min(8, camera.position.x));
+            camera.position.z = Math.max(-2.5, Math.min(10, camera.position.z));
+            
+            // 카메라 회전 적용
+            camera.rotation.y = playerState.rotation;
+            camera.rotation.x = playerState.pitch;
+            
+            sensors.children.forEach((sensor, i) => {
+                sensor.material.emissiveIntensity = 0.5 + Math.sin(Date.now() * 0.003 + i * 2) * 0.5;
+            });
+            
+            const threat = getThreatLevel();
+            updateDoorLock(threat);
+            
+            renderer.render(scene, camera);
+        }
+        
+        function updateSensors() {
+            setInterval(() => {
+                const doorPosition = new THREE.Vector3(0.6, 1.5, -2.85);
+                sensorData.distance = Math.round(camera.position.distanceTo(doorPosition) * 100);
+                
+                if (sensorData.distance < 150) {
+                    if (sensorData.dwellStartTime === null) {
+                        sensorData.dwellStartTime = Date.now();
+                    }
+                    sensorData.dwellTime = Math.floor((Date.now() - sensorData.dwellStartTime) / 1000);
+                } else {
+                    sensorData.dwellStartTime = null;
+                    sensorData.dwellTime = 0;
+                }
+                
+                sensorData.vibration = Math.max(0, sensorData.vibration - 0.5);
+                sensorData.audio = Math.max(40, sensorData.audio - 5);
+                
+                updateUI();
+            }, 100);
+        }
+        
+        function getThreatLevel() {
+            let d = Math.max(0, (300 - sensorData.distance) / 300);
+            let t = Math.min(sensorData.dwellTime / 120, 1);
+            let v = Math.min(sensorData.vibration / 10, 1);
+            let a = Math.min(Math.max((sensorData.audio - 40) / 80, 0), 1);
+            let h = sensorData.housingOpen ? 1 : 0;
+            
+            let score = d * 0.25 + t * 0.25 + v * 0.20 + a * 0.15 + h * 0.15;
+            
+            return {
+                score: score,
+                level: score < 0.3 ? 'SAFE' : score < 0.6 ? 'CAUTION' : score < 0.85 ? 'DANGER' : 'CRITICAL',
+                contributions: {
+                    distance: d * 0.25,
+                    dwell: t * 0.25,
+                    vibration: v * 0.20,
+                    audio: a * 0.15,
+                    housing: h * 0.15
+                }
+            };
+        }
+        
+        function updateDoorLock(threat) {
+            const level = threat.level;
+            
+            if (level === 'SAFE') {
+                doorLock.material.color.setHex(0x00ff88);
+                doorLock.material.emissive.setHex(0x00ff88);
+                doorLock.material.emissiveIntensity = 0.5;
+            } else if (level === 'CAUTION') {
+                doorLock.material.color.setHex(0xffff00);
+                doorLock.material.emissive.setHex(0xffff00);
+                doorLock.material.emissiveIntensity = 0.7;
+            } else if (level === 'DANGER') {
+                doorLock.material.color.setHex(0xff8800);
+                doorLock.material.emissive.setHex(0xff8800);
+                doorLock.material.emissiveIntensity = 0.9;
+                door.rotation.y = Math.sin(Date.now() * 0.01) * 0.03;
+            } else {
+                doorLock.material.color.setHex(0xff0044);
+                doorLock.material.emissive.setHex(0xff0044);
+                doorLock.material.emissiveIntensity = 1.2;
+                door.rotation.y = Math.sin(Date.now() * 0.02) * 0.08;
+                doorLock.position.x = 0.6 + Math.sin(Date.now() * 0.05) * 0.05;
+            }
+        }
+        
+        function updateUI() {
+            const threat = getThreatLevel();
+            const score = threat.score;
+            const level = threat.level;
+            const contrib = threat.contributions;
+            
+            const screenValue = document.getElementById('screen-risk-value');
+            const screenLabel = document.getElementById('screen-risk-label');
+            screenValue.textContent = score.toFixed(2);
+            screenLabel.textContent = level;
+            screenValue.className = 'screen-risk-value ' + level.toLowerCase();
+            
+            document.getElementById('risk-score').textContent = score.toFixed(2);
+            document.getElementById('risk-score').style.color = 
+                level === 'SAFE' ? '#00ff88' : 
+                level === 'CAUTION' ? '#ffff00' : 
+                level === 'DANGER' ? '#ff8800' : '#ff0044';
+            
+            const gauge = document.getElementById('risk-gauge');
+            gauge.style.width = (score * 100) + '%';
+            gauge.className = 'risk-gauge-fill ' + level.toLowerCase();
+            
+            document.getElementById('distance-contribution').textContent = contrib.distance.toFixed(3);
+            document.getElementById('distance-bar').style.width = (contrib.distance * 400) + '%';
+            
+            document.getElementById('dwell-contribution').textContent = contrib.dwell.toFixed(3);
+            document.getElementById('dwell-bar').style.width = (contrib.dwell * 400) + '%';
+            
+            document.getElementById('vibration-contribution').textContent = contrib.vibration.toFixed(3);
+            document.getElementById('vibration-bar').style.width = (contrib.vibration * 500) + '%';
+            
+            document.getElementById('audio-contribution').textContent = contrib.audio.toFixed(3);
+            document.getElementById('audio-bar').style.width = (contrib.audio * 666) + '%';
+            
+            document.getElementById('housing-contribution').textContent = contrib.housing.toFixed(3);
+            document.getElementById('housing-bar').style.width = (contrib.housing * 666) + '%';
+            
+            document.getElementById('distance-display').textContent = sensorData.distance + 'cm';
+            document.getElementById('dwell-display').textContent = sensorData.dwellTime + '초';
+            document.getElementById('vibration-display').textContent = sensorData.vibration.toFixed(1) + 'g';
+            document.getElementById('audio-display').textContent = Math.round(sensorData.audio) + 'dB';
+            
+            const panel = document.getElementById('status-panel');
+            panel.className = level;
+            document.getElementById('threat-level').textContent = level;
+            
+            const responseBox = document.getElementById('response-box');
+            const responseActions = document.getElementById('response-actions');
+            
+            if (level === 'DANGER' || level === 'CRITICAL') {
+                responseBox.classList.add('show');
+                let actions = level === 'DANGER' ? 
+                    ['📱 사용자 긴급 알림', '📹 고화질 녹화', '🔒 잠금 강화'] :
+                    ['🚓 자동 경찰 신고', '🔐 비상 잠금', '📦 증거 전송', '🔊 사이렌'];
+                
+                responseActions.innerHTML = actions.map(a => `<div style="margin: 5px 0;">✓ ${a}</div>`).join('');
+            } else {
+                responseBox.classList.remove('show');
+            }
+        }
+        
+        function ringDoorbell() {
+            sensorData.audio = 70;
+            showTimer('🔔');
+        }
+        
+        function useDrill() {
+            let drillTime = 0;
+            const drillInterval = setInterval(() => {
+                drillTime++;
+                sensorData.vibration = 5 + Math.random() * 3;
+                sensorData.audio = 85 + Math.random() * 10;
+                showTimer(`🔨 ${drillTime}초`);
+                
+                if (drillTime >= 3) {
+                    clearInterval(drillInterval);
+                }
+            }, 1000);
+        }
+        
+        function kickDoor() {
+            sensorData.vibration = 8;
+            sensorData.audio = 95;
+            door.rotation.y = 0.2;
+            setTimeout(() => door.rotation.y = 0, 500);
+            showTimer('👟 KICK!');
+        }
+        
+        function openHousing() {
+            sensorData.housingOpen = true;
+            doorLock.scale.x = 1.5;
+            showTimer('🔓 외함 개방!');
+            setTimeout(() => {
+                sensorData.housingOpen = false;
+                doorLock.scale.x = 1;
+            }, 5000);
+        }
+        
+        function showTimer(text) {
+            const timer = document.getElementById('timer');
+            timer.textContent = text;
+            timer.style.opacity = '1';
+            setTimeout(() => timer.style.opacity = '0', 2000);
+        }
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        initScene();
+    </script>
+</body>
+</html>
