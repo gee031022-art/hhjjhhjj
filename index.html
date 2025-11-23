@@ -18,7 +18,6 @@
             color: white;
         }
         
-        /* 3D 캔버스 - 최하단 레이어 */
         #canvas-container {
             position: fixed;
             top: 0;
@@ -28,7 +27,6 @@
             z-index: 1;
         }
         
-        /* UI 레이어 - 3D 위에 표시 */
         .ui-layer {
             position: fixed;
             top: 0;
@@ -353,13 +351,23 @@
             border-color: #ffaa00;
             box-shadow: 0 0 20px rgba(255, 170, 0, 0.6);
         }
+        
+        /* 배회 경고 표시 */
+        .loitering-warning {
+            color: #ff8800;
+            font-weight: bold;
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
     </style>
 </head>
 <body>
-    <!-- 3D 캔버스 (맨 뒤) -->
     <div id="canvas-container"></div>
     
-    <!-- UI 레이어 (3D 위) -->
     <div class="ui-layer">
         <div id="mouse-mode-indicator" class="cursor-mode">🖱️ 커서 모드</div>
         
@@ -379,6 +387,9 @@
             </div>
             <div class="control-item" style="background: rgba(0, 255, 136, 0.2); border-left: 4px solid #00ff88;">
                 <span class="mouse-icon">우클릭 홀드</span> 시점 회전
+            </div>
+            <div style="margin-top: 10px; padding: 10px; background: rgba(255, 136, 0, 0.2); border-radius: 5px; font-size: 0.85em;">
+                ⚠️ 도어락 주변을 왔다갔다 하면 배회로 감지됩니다!
             </div>
         </div>
         
@@ -415,7 +426,7 @@
                 
                 <div class="sensor-item">
                     <div class="sensor-header">
-                        <span style="color: #aaa;">거리 (25%)</span>
+                        <span style="color: #aaa;">거리 (20%)</span>
                         <span style="font-weight: bold;" id="distance-contribution">0.00</span>
                     </div>
                     <div class="sensor-bar">
@@ -425,7 +436,7 @@
                 
                 <div class="sensor-item">
                     <div class="sensor-header">
-                        <span style="color: #aaa;">체류시간 (25%)</span>
+                        <span style="color: #aaa;">체류시간 (20%)</span>
                         <span style="font-weight: bold;" id="dwell-contribution">0.00</span>
                     </div>
                     <div class="sensor-bar">
@@ -435,11 +446,21 @@
                 
                 <div class="sensor-item">
                     <div class="sensor-header">
-                        <span style="color: #aaa;">진동 (20%)</span>
+                        <span style="color: #aaa;">배회 패턴 (20%)</span>
+                        <span style="font-weight: bold;" id="loitering-contribution">0.00</span>
+                    </div>
+                    <div class="sensor-bar">
+                        <div class="sensor-bar-fill" id="loitering-bar" style="background: #ff8800; width: 0%;"></div>
+                    </div>
+                </div>
+                
+                <div class="sensor-item">
+                    <div class="sensor-header">
+                        <span style="color: #aaa;">진동 (15%)</span>
                         <span style="font-weight: bold;" id="vibration-contribution">0.00</span>
                     </div>
                     <div class="sensor-bar">
-                        <div class="sensor-bar-fill" id="vibration-bar" style="background: #ff8800; width: 0%;"></div>
+                        <div class="sensor-bar-fill" id="vibration-bar" style="background: #ff6600; width: 0%;"></div>
                     </div>
                 </div>
                 
@@ -455,7 +476,7 @@
                 
                 <div class="sensor-item">
                     <div class="sensor-header">
-                        <span style="color: #aaa;">외함 (15%)</span>
+                        <span style="color: #aaa;">외함 (10%)</span>
                         <span style="font-weight: bold;" id="housing-contribution">0.00</span>
                     </div>
                     <div class="sensor-bar">
@@ -474,6 +495,14 @@
                     <div>
                         <div style="font-size: 0.75em; color: #888;">체류</div>
                         <div id="dwell-display" style="font-size: 1.1em; font-weight: bold;">0초</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75em; color: #888;">배회 횟수</div>
+                        <div id="loitering-display" style="font-size: 1.1em; font-weight: bold;">0회</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.75em; color: #888;">이동 거리</div>
+                        <div id="movement-display" style="font-size: 1.1em; font-weight: bold;">0m</div>
                     </div>
                     <div>
                         <div style="font-size: 0.75em; color: #888;">진동</div>
@@ -515,13 +544,22 @@
         
         let keys = { w: false, a: false, s: false, d: false, space: false, shift: false };
         
+        // 센서 데이터 + 배회 감지
         let sensorData = {
             distance: 300,
             dwellTime: 0,
             dwellStartTime: null,
             vibration: 0,
             audio: 40,
-            housingOpen: false
+            housingOpen: false,
+            audioEventCount: 0,
+            vibrationEventCount: 0,
+            // 배회 감지 데이터
+            loiteringScore: 0,
+            positionHistory: [],
+            directionChanges: 0,
+            totalMovement: 0,
+            lastPosition: new THREE.Vector3(0, 0, 5)
         };
         
         function initScene() {
@@ -720,6 +758,7 @@
                 const doorPosition = new THREE.Vector3(0.6, 1.5, -2.85);
                 sensorData.distance = Math.round(camera.position.distanceTo(doorPosition) * 100);
                 
+                // 체류 시간
                 if (sensorData.distance < 150) {
                     if (sensorData.dwellStartTime === null) {
                         sensorData.dwellStartTime = Date.now();
@@ -730,31 +769,107 @@
                     sensorData.dwellTime = 0;
                 }
                 
-                sensorData.vibration = Math.max(0, sensorData.vibration - 0.5);
-                sensorData.audio = Math.max(40, sensorData.audio - 5);
+                // 배회 패턴 감지
+                detectLoitering();
+                
+                // 진동 감쇠
+                sensorData.vibration = Math.max(0, sensorData.vibration - 0.2);
+                
+                // 음압 감쇠
+                sensorData.audio = Math.max(40, sensorData.audio - 2);
                 
                 updateUI();
             }, 100);
         }
         
+        // 배회 패턴 감지 함수
+        function detectLoitering() {
+            const currentPos = camera.position.clone();
+            const doorPos = new THREE.Vector3(0.6, 1.5, -2.85);
+            const distanceToDoor = currentPos.distanceTo(doorPos);
+            
+            // 도어락 근처 (3m 이내)에서만 배회 감지
+            if (distanceToDoor < 3) {
+                // 이동 거리 계산
+                const movementDelta = currentPos.distanceTo(sensorData.lastPosition);
+                
+                if (movementDelta > 0.01) {  // 실제로 움직였을 때만
+                    sensorData.totalMovement += movementDelta;
+                    
+                    // 위치 히스토리 저장 (최근 20개)
+                    sensorData.positionHistory.push(currentPos.clone());
+                    if (sensorData.positionHistory.length > 20) {
+                        sensorData.positionHistory.shift();
+                    }
+                    
+                    // 방향 전환 감지
+                    if (sensorData.positionHistory.length >= 3) {
+                        const recent = sensorData.positionHistory.slice(-3);
+                        const dir1 = new THREE.Vector3().subVectors(recent[1], recent[0]).normalize();
+                        const dir2 = new THREE.Vector3().subVectors(recent[2], recent[1]).normalize();
+                        const angle = dir1.angleTo(dir2);
+                        
+                        // 90도 이상 방향 전환 시 배회로 판단
+                        if (angle > Math.PI / 2) {
+                            sensorData.directionChanges++;
+                        }
+                    }
+                }
+                
+                // 배회 점수 계산: 이동거리 + 방향전환
+                sensorData.loiteringScore = Math.min(
+                    (sensorData.totalMovement / 10) * 0.6 +  // 10m 이동 = 0.6
+                    (sensorData.directionChanges / 5) * 0.4,  // 5번 방향전환 = 0.4
+                    1.0
+                );
+                
+                sensorData.lastPosition.copy(currentPos);
+            } else {
+                // 멀어지면 배회 점수 감쇠
+                sensorData.loiteringScore = Math.max(0, sensorData.loiteringScore - 0.01);
+                if (distanceToDoor > 5) {
+                    // 완전히 멀어지면 초기화
+                    sensorData.totalMovement = 0;
+                    sensorData.directionChanges = 0;
+                    sensorData.positionHistory = [];
+                }
+            }
+        }
+        
         function getThreatLevel() {
+            // 거리 점수
             let d = Math.max(0, (300 - sensorData.distance) / 300);
-            let t = Math.min(sensorData.dwellTime / 120, 1);
+            
+            // 체류 시간 점수
+            let t = Math.min(sensorData.dwellTime / 30, 1);
+            
+            // 배회 점수 (새로 추가!)
+            let l = sensorData.loiteringScore;
+            
+            // 진동 점수
             let v = Math.min(sensorData.vibration / 10, 1);
-            let a = Math.min(Math.max((sensorData.audio - 40) / 80, 0), 1);
+            
+            // 음압 점수
+            let audioBase = Math.min(Math.max((sensorData.audio - 40) / 80, 0), 1);
+            let audioEvent = Math.min(sensorData.audioEventCount / 5, 1);
+            let a = Math.max(audioBase, audioEvent * 0.8);
+            
+            // 외함 점수
             let h = sensorData.housingOpen ? 1 : 0;
             
-            let score = d * 0.25 + t * 0.25 + v * 0.20 + a * 0.15 + h * 0.15;
+            // 가중치 재조정 (배회 20% 추가)
+            let score = d * 0.20 + t * 0.20 + l * 0.20 + v * 0.15 + a * 0.15 + h * 0.10;
             
             return {
                 score: score,
                 level: score < 0.3 ? 'SAFE' : score < 0.6 ? 'CAUTION' : score < 0.85 ? 'DANGER' : 'CRITICAL',
                 contributions: {
-                    distance: d * 0.25,
-                    dwell: t * 0.25,
-                    vibration: v * 0.20,
+                    distance: d * 0.20,
+                    dwell: t * 0.20,
+                    loitering: l * 0.20,
+                    vibration: v * 0.15,
                     audio: a * 0.15,
-                    housing: h * 0.15
+                    housing: h * 0.10
                 }
             };
         }
@@ -799,22 +914,27 @@
             gauge.className = 'risk-gauge-fill ' + level.toLowerCase();
             
             document.getElementById('distance-contribution').textContent = contrib.distance.toFixed(3);
-            document.getElementById('distance-bar').style.width = (contrib.distance * 400) + '%';
+            document.getElementById('distance-bar').style.width = (contrib.distance * 500) + '%';
             
             document.getElementById('dwell-contribution').textContent = contrib.dwell.toFixed(3);
-            document.getElementById('dwell-bar').style.width = (contrib.dwell * 400) + '%';
+            document.getElementById('dwell-bar').style.width = (contrib.dwell * 500) + '%';
+            
+            document.getElementById('loitering-contribution').textContent = contrib.loitering.toFixed(3);
+            document.getElementById('loitering-bar').style.width = (contrib.loitering * 500) + '%';
             
             document.getElementById('vibration-contribution').textContent = contrib.vibration.toFixed(3);
-            document.getElementById('vibration-bar').style.width = (contrib.vibration * 500) + '%';
+            document.getElementById('vibration-bar').style.width = (contrib.vibration * 666) + '%';
             
             document.getElementById('audio-contribution').textContent = contrib.audio.toFixed(3);
             document.getElementById('audio-bar').style.width = (contrib.audio * 666) + '%';
             
             document.getElementById('housing-contribution').textContent = contrib.housing.toFixed(3);
-            document.getElementById('housing-bar').style.width = (contrib.housing * 666) + '%';
+            document.getElementById('housing-bar').style.width = (contrib.housing * 1000) + '%';
             
             document.getElementById('distance-display').textContent = sensorData.distance + 'cm';
             document.getElementById('dwell-display').textContent = sensorData.dwellTime + '초';
+            document.getElementById('loitering-display').textContent = sensorData.directionChanges + '회';
+            document.getElementById('movement-display').textContent = sensorData.totalMovement.toFixed(1) + 'm';
             document.getElementById('vibration-display').textContent = sensorData.vibration.toFixed(1) + 'g';
             document.getElementById('audio-display').textContent = Math.round(sensorData.audio) + 'dB';
             
@@ -838,16 +958,18 @@
         }
         
         function ringDoorbell() {
-            sensorData.audio = 70;
-            showTimer('🔔');
+            sensorData.audio = Math.min(120, sensorData.audio + 30);
+            sensorData.audioEventCount++;
+            showTimer(`🔔 ${sensorData.audioEventCount}회`);
         }
         
         function useDrill() {
             let drillTime = 0;
             const drillInterval = setInterval(() => {
                 drillTime++;
-                sensorData.vibration = 5 + Math.random() * 3;
-                sensorData.audio = 85 + Math.random() * 10;
+                sensorData.vibration = Math.min(10, sensorData.vibration + 2);
+                sensorData.audio = Math.min(120, 85 + Math.random() * 10);
+                sensorData.vibrationEventCount++;
                 showTimer(`🔨 ${drillTime}초`);
                 
                 if (drillTime >= 3) {
@@ -857,8 +979,8 @@
         }
         
         function kickDoor() {
-            sensorData.vibration = 8;
-            sensorData.audio = 95;
+            sensorData.vibration = Math.min(10, sensorData.vibration + 8);
+            sensorData.audio = Math.min(120, sensorData.audio + 50);
             door.rotation.y = 0.2;
             setTimeout(() => door.rotation.y = 0, 500);
             showTimer('👟 KICK!');
