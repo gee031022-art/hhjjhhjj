@@ -414,7 +414,7 @@
         <div id="action-panel">
             <div class="action-title">⚡ 위협 시뮬레이션</div>
             <button class="action-btn bell" onclick="ringDoorbell()">🔔 도어벨 누르기</button>
-            <button class="action-btn drill" onclick="useDrill()">🔨 드릴 사용 (지속)</button>
+            <button class="action-btn drill" onclick="useDrill()" id="drill-btn">🔨 드릴 사용 (지속)</button>
             <button class="action-btn kick" onclick="kickDoor()">👟 문 차기</button>
             <button class="action-btn" onclick="openHousing()" style="border-color: #ff0044;">🔓 외함 열기</button>
         </div>
@@ -445,7 +445,7 @@
                 <div class="sensor-item">
                     <div class="sensor-header">
                         <span style="color: #aaa;">거리 (20%)</span>
-                        <span style="font-weight: bold;" id="distance-contribution">0.00</span>
+                        <span style="font-weight: bold;" id="distance-contribution">0.000</span>
                     </div>
                     <div class="sensor-bar">
                         <div class="sensor-bar-fill" id="distance-bar" style="background: #00ff88; width: 0%;"></div>
@@ -455,7 +455,7 @@
                 <div class="sensor-item">
                     <div class="sensor-header">
                         <span style="color: #aaa;">체류시간 (20%)</span>
-                        <span style="font-weight: bold;" id="dwell-contribution">0.00</span>
+                        <span style="font-weight: bold;" id="dwell-contribution">0.000</span>
                     </div>
                     <div class="sensor-bar">
                         <div class="sensor-bar-fill" id="dwell-bar" style="background: #ffaa00; width: 0%;"></div>
@@ -465,7 +465,7 @@
                 <div class="sensor-item">
                     <div class="sensor-header">
                         <span style="color: #aaa;">배회 (20%)</span>
-                        <span style="font-weight: bold;" id="loitering-contribution">0.00</span>
+                        <span style="font-weight: bold;" id="loitering-contribution">0.000</span>
                     </div>
                     <div class="sensor-bar">
                         <div class="sensor-bar-fill" id="loitering-bar" style="background: #ff8800; width: 0%;"></div>
@@ -475,7 +475,7 @@
                 <div class="sensor-item">
                     <div class="sensor-header">
                         <span style="color: #aaa;">진동 (20%)</span>
-                        <span style="font-weight: bold;" id="vibration-contribution">0.00</span>
+                        <span style="font-weight: bold;" id="vibration-contribution">0.000</span>
                     </div>
                     <div class="sensor-bar">
                         <div class="sensor-bar-fill" id="vibration-bar" style="background: #ff6600; width: 0%;"></div>
@@ -485,7 +485,7 @@
                 <div class="sensor-item">
                     <div class="sensor-header">
                         <span style="color: #aaa;">음압 (15%)</span>
-                        <span style="font-weight: bold;" id="audio-contribution">0.00</span>
+                        <span style="font-weight: bold;" id="audio-contribution">0.000</span>
                     </div>
                     <div class="sensor-bar">
                         <div class="sensor-bar-fill" id="audio-bar" style="background: #ff4400; width: 0%;"></div>
@@ -495,7 +495,7 @@
                 <div class="sensor-item">
                     <div class="sensor-header">
                         <span style="color: #aaa;">외함 (5%)</span>
-                        <span style="font-weight: bold;" id="housing-contribution">0.00</span>
+                        <span style="font-weight: bold;" id="housing-contribution">0.000</span>
                     </div>
                     <div class="sensor-bar">
                         <div class="sensor-bar-fill" id="housing-bar" style="background: #ff0044; width: 0%;"></div>
@@ -523,11 +523,11 @@
                         <div id="movement-display" style="font-size: 1.1em; font-weight: bold;">0m</div>
                     </div>
                     <div>
-                        <div style="font-size: 0.75em; color: #888;">진동</div>
-                        <div id="vibration-display" style="font-size: 1.1em; font-weight: bold;">0.0g</div>
+                        <div style="font-size: 0.75em; color: #888;">진동(raw)</div>
+                        <div id="vibration-display" style="font-size: 1.1em; font-weight: bold;">0.0</div>
                     </div>
                     <div>
-                        <div style="font-size: 0.75em; color: #888;">음압</div>
+                        <div style="font-size: 0.75em; color: #888;">음압(raw)</div>
                         <div id="audio-display" style="font-size: 1.1em; font-weight: bold;">40dB</div>
                     </div>
                 </div>
@@ -563,12 +563,13 @@
         
         let keys = { w: false, a: false, s: false, d: false, space: false, shift: false };
         
+        // 센서 데이터 - 누적 방식으로 변경
         let sensorData = {
             distance: 300,
             dwellTime: 0,
             dwellStartTime: null,
-            vibration: 0,
-            audio: 40,
+            vibration: 0,        // 누적 진동값
+            audio: 40,            // 누적 음압값
             housingOpen: false,
             audioEventCount: 0,
             vibrationEventCount: 0,
@@ -787,8 +788,11 @@
                 
                 detectLoitering();
                 
-                sensorData.vibration = Math.max(0, sensorData.vibration - 0.2);
-                sensorData.audio = Math.max(40, sensorData.audio - 2);
+                // 진동 감쇠 (더 느리게)
+                sensorData.vibration = Math.max(0, sensorData.vibration - 0.05);
+                
+                // 음압 감쇠 (더 느리게)
+                sensorData.audio = Math.max(40, sensorData.audio - 1);
                 
                 updateUI();
             }, 100);
@@ -840,18 +844,29 @@
         }
         
         function getThreatLevel() {
+            // 거리 (0~1)
             let d = Math.max(0, (300 - sensorData.distance) / 300);
+            
+            // 체류 시간 (0~1) - 30초 이상 = 최대
             let t = Math.min(sensorData.dwellTime / 30, 1);
+            
+            // 배회 (0~1)
             let l = sensorData.loiteringScore;
-            let v = Math.min(sensorData.vibration / 10, 1);
             
-            let audioBase = Math.min(Math.max((sensorData.audio - 40) / 80, 0), 1);
-            let audioEvent = Math.min(sensorData.audioEventCount / 5, 1);
-            let a = Math.max(audioBase, audioEvent * 0.8);
+            // 진동 (0~1) - 이제 cumulative 누적값
+            let v = Math.min(sensorData.vibration / 50, 1);  // 50 = 최대 진동값
             
+            // 음압 (0~1) - cumulative 누적값
+            let audioBase = Math.min(Math.max((sensorData.audio - 40) / 120, 0), 1);  // 40~160dB = 0~1
+            let a = audioBase;
+            
+            // 외함 (0~1)
             let h = sensorData.housingOpen ? 1 : 0;
             
+            // 최종 점수: 모든 센서를 합산
             let score = d * 0.20 + t * 0.20 + l * 0.20 + v * 0.20 + a * 0.15 + h * 0.05;
+            
+            console.log(`Risk Components - D:${d.toFixed(2)} T:${t.toFixed(2)} L:${l.toFixed(2)} V:${v.toFixed(2)} A:${a.toFixed(2)} H:${h.toFixed(2)} = ${score.toFixed(3)}`);
             
             return {
                 score: score,
@@ -906,6 +921,7 @@
             gauge.style.width = (score * 100) + '%';
             gauge.className = 'risk-gauge-fill ' + level.toLowerCase();
             
+            // 기여도 표시 (3자리)
             document.getElementById('distance-contribution').textContent = contrib.distance.toFixed(3);
             document.getElementById('distance-bar').style.width = (contrib.distance * 500) + '%';
             
@@ -924,11 +940,12 @@
             document.getElementById('housing-contribution').textContent = contrib.housing.toFixed(3);
             document.getElementById('housing-bar').style.width = (contrib.housing * 2000) + '%';
             
+            // 센서 Raw값 표시
             document.getElementById('distance-display').textContent = sensorData.distance + 'cm';
             document.getElementById('dwell-display').textContent = sensorData.dwellTime + '초';
             document.getElementById('loitering-display').textContent = sensorData.directionChanges + '회';
             document.getElementById('movement-display').textContent = sensorData.totalMovement.toFixed(1) + 'm';
-            document.getElementById('vibration-display').textContent = sensorData.vibration.toFixed(1) + 'g';
+            document.getElementById('vibration-display').textContent = sensorData.vibration.toFixed(1);
             document.getElementById('audio-display').textContent = Math.round(sensorData.audio) + 'dB';
             
             const panel = document.getElementById('status-panel');
@@ -950,38 +967,44 @@
             }
         }
         
-        // 드릴 - 지속 동작
+        // 드릴 - 지속 동작 (무제한)
         function useDrill() {
+            const btn = document.getElementById('drill-btn');
+            
             if (isDrillingActive) {
                 isDrillingActive = false;
+                btn.textContent = '🔨 드릴 사용 (지속)';
                 showTimer('🔨 드릴 중지');
                 return;
             }
             
             isDrillingActive = true;
-            showTimer('🔨 드릴 중...');
+            btn.textContent = '🔨 드릴 중단 클릭...';
+            showTimer('🔨 드릴 시작!');
             
             const drillInterval = setInterval(() => {
                 if (!isDrillingActive) {
                     clearInterval(drillInterval);
+                    btn.textContent = '🔨 드릴 사용 (지속)';
                     return;
                 }
                 
-                sensorData.vibration = Math.min(10, sensorData.vibration + 1.5);
-                sensorData.audio = Math.min(120, 85 + Math.random() * 10);
+                // 진동 +2씩 누적 (무제한)
+                sensorData.vibration += 2;
+                sensorData.audio = Math.min(200, sensorData.audio + 0.5);  // 음압도 약간 증가
                 sensorData.vibrationEventCount++;
-            }, 500);
+            }, 400);  // 400ms마다 업데이트
         }
         
         function ringDoorbell() {
-            sensorData.audio = Math.min(120, sensorData.audio + 30);
+            sensorData.audio += 35;  // 즉시 +35dB
             sensorData.audioEventCount++;
             showTimer(`🔔 ${sensorData.audioEventCount}회`);
         }
         
         function kickDoor() {
-            sensorData.vibration = Math.min(10, sensorData.vibration + 8);
-            sensorData.audio = Math.min(120, sensorData.audio + 50);
+            sensorData.vibration += 8;
+            sensorData.audio += 50;
             door.rotation.y = 0.2;
             setTimeout(() => door.rotation.y = 0, 500);
             showTimer('👟 KICK!');
