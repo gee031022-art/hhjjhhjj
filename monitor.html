@@ -144,6 +144,13 @@
             animation: pulse-critical 1s infinite;
         }
         
+        .status-indicator.locked {
+            background: rgba(100, 0, 0, 0.3);
+            border: 2px solid #ff0000;
+            color: #ff0000;
+            animation: pulse-critical 0.5s infinite;
+        }
+        
         .status-dot {
             width: 10px;
             height: 10px;
@@ -155,6 +162,7 @@
         .status-indicator.caution .status-dot { background: #ffff00; }
         .status-indicator.danger .status-dot { background: #ff8800; }
         .status-indicator.critical .status-dot { background: #ff0044; }
+        .status-indicator.locked .status-dot { background: #ff0000; }
         
         /* 탭 1: 위협도 */
         .threat-container {
@@ -213,6 +221,7 @@
         .threat-level-large.caution { color: #ffff00; background: rgba(255, 255, 0, 0.15); }
         .threat-level-large.danger { color: #ff8800; background: rgba(255, 136, 0, 0.15); }
         .threat-level-large.critical { color: #ff0044; background: rgba(255, 0, 68, 0.15); }
+        .threat-level-large.locked { color: #ff0000; background: rgba(255, 0, 0, 0.2); }
         
         /* 센서 패널 */
         .sensor-grid {
@@ -283,6 +292,10 @@
         .sensor-item.housing .sensor-value { color: #ff0044; }
         .sensor-item.housing .sensor-bar-fill { background: #ff0044; }
         
+        .sensor-item.password { border-left-color: #9900ff; }
+        .sensor-item.password .sensor-value { color: #9900ff; }
+        .sensor-item.password .sensor-bar-fill { background: #9900ff; }
+        
         /* 알림 패널 */
         .alerts-list {
             display: flex;
@@ -325,33 +338,10 @@
             border-left-color: #ff0044;
         }
         
-        /* 타임라인 */
-        .timeline-horizontal {
-            display: flex;
-            gap: 6px;
-            overflow-x: auto;
-            padding: 12px 0;
-            align-items: center;
+        .alert-item.locked {
+            background: rgba(255, 0, 0, 0.2);
+            border-left-color: #ff0000;
         }
-        
-        .timeline-dot {
-            min-width: 30px;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            border: 2px solid;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .timeline-dot:hover {
-            transform: scale(1.2);
-        }
-        
-        .timeline-dot.safe { background: rgba(0, 255, 136, 0.2); border-color: #00ff88; }
-        .timeline-dot.caution { background: rgba(255, 255, 0, 0.2); border-color: #ffff00; }
-        .timeline-dot.danger { background: rgba(255, 136, 0, 0.2); border-color: #ff8800; }
-        .timeline-dot.critical { background: rgba(255, 0, 68, 0.2); border-color: #ff0044; }
         
         /* 애니메이션 */
         @keyframes blink {
@@ -407,7 +397,6 @@
             <button class="tab-btn active" onclick="switchTab(0)">위협도</button>
             <button class="tab-btn" onclick="switchTab(1)">센서</button>
             <button class="tab-btn" onclick="switchTab(2)">알림</button>
-            <button class="tab-btn" onclick="switchTab(3)">경과</button>
         </div>
         
         <!-- 탭 1: 위협도 분석 -->
@@ -505,6 +494,17 @@
                     </div>
                     <div class="sensor-contrib">기여: <span id="contrib-housing">0.000</span></div>
                 </div>
+                
+                <div class="sensor-item password">
+                    <div class="sensor-header">
+                        <span>🔑 비밀번호</span>
+                        <span class="sensor-value" id="sensor-password">0회</span>
+                    </div>
+                    <div class="sensor-bar">
+                        <div class="sensor-bar-fill" id="sensor-password-bar" style="width: 0%;"></div>
+                    </div>
+                    <div class="sensor-contrib">상태: <span id="contrib-password">정상</span></div>
+                </div>
             </div>
         </div>
         
@@ -518,15 +518,6 @@
                 <div style="text-align: center; color: #888; padding: 20px;">대기 중...</div>
             </div>
         </div>
-        
-        <!-- 탭 4: 경과 -->
-        <div id="tab-3" class="tab-content">
-            <div class="header">
-                <div class="header-title">📈 경과</div>
-            </div>
-            
-            <div class="timeline-horizontal" id="timeline-container"></div>
-        </div>
     </div>
     
     <script>
@@ -538,12 +529,12 @@
             vibration: 0,
             audio: 40,
             housingOpen: false,
-            directionChanges: 0
+            directionChanges: 0,
+            passwordFailures: 0,
+            doorLocked: false
         };
         
-        let threatHistory = [];
         let alertHistory = [];
-        const MAX_HISTORY = 120;
         
         // 탭 전환
         function switchTab(index) {
@@ -567,7 +558,9 @@
                             vibration: data.vibration || 0,
                             audio: data.audio || 40,
                             housingOpen: data.housingOpen || false,
-                            directionChanges: data.directionChanges || 0
+                            directionChanges: data.directionChanges || 0,
+                            passwordFailures: data.passwordFailures || 0,
+                            doorLocked: data.doorLocked || false
                         };
                     } catch (e) {
                         localSimulation();
@@ -596,15 +589,37 @@
             sensorData.loiteringScore = Math.min(sensorData.loiteringScore, 1);
         }
         
+        function calculateLockoutLevel() {
+            const failures = sensorData.passwordFailures;
+            const loitering = sensorData.loiteringScore > 0.5;
+            const nearDoor = sensorData.distance < 100;
+            const dwell = sensorData.dwellTime > 10;
+            
+            if (failures >= 5) return 'FORCE_LOCK';
+            if (failures >= 2 && (loitering || (nearDoor && dwell))) return 'SMART_LOCK';
+            if (failures >= 3 && dwell && !loitering) return 'CAUTION';
+            
+            return null;
+        }
+        
         function calculateThreatLevel() {
+            if (sensorData.doorLocked) {
+                return {
+                    score: 1.0,
+                    level: 'LOCKED',
+                    contributions: { d: 0, t: 0, l: 0, v: 0, a: 0, h: 0, pw: 1.0 }
+                };
+            }
+            
             const d = Math.max(0, (300 - sensorData.distance) / 300);
             const t = Math.min(sensorData.dwellTime / 30, 1);
             const l = sensorData.loiteringScore;
             const v = sensorData.vibration / 20;
             const a = Math.max(0, (sensorData.audio - 40) / 100);
             const h = sensorData.housingOpen ? 1 : 0;
+            const pw = Math.min(sensorData.passwordFailures / 5, 1) * 0.3;
             
-            const score = d * 0.20 + t * 0.20 + l * 0.20 + v * 0.20 + a * 0.15 + h * 0.05;
+            const score = d * 0.20 + t * 0.20 + l * 0.20 + v * 0.20 + a * 0.15 + h * 0.05 + pw;
             
             return {
                 score: score,
@@ -615,20 +630,32 @@
                     l: l * 0.20,
                     v: v * 0.20,
                     a: a * 0.15,
-                    h: h * 0.05
+                    h: h * 0.05,
+                    pw: pw
                 }
             };
         }
         
         function updateDisplay() {
             const threat = calculateThreatLevel();
+            const lockout = calculateLockoutLevel();
+            
+            if (lockout) {
+                sensorData.doorLocked = true;
+                if (lockout === 'FORCE_LOCK') {
+                    addAlert('LOCKED', '🔴 강제 잠금! 5회 연속 실패');
+                } else if (lockout === 'SMART_LOCK') {
+                    addAlert('LOCKED', '🔴 스마트 잠금! 의심 행동 감지');
+                }
+            }
             
             // 위협도 업데이트
             document.getElementById('threat-score').textContent = threat.score.toFixed(2);
             document.getElementById('threat-score').style.color = 
                 threat.level === 'SAFE' ? '#00ff88' : 
                 threat.level === 'CAUTION' ? '#ffff00' :
-                threat.level === 'DANGER' ? '#ff8800' : '#ff0044';
+                threat.level === 'DANGER' ? '#ff8800' : 
+                threat.level === 'CRITICAL' ? '#ff0044' : '#ff0000';
             
             const gaugePercent = Math.min(threat.score * 100, 100);
             document.getElementById('threat-gauge').style.width = gaugePercent + '%';
@@ -636,13 +663,13 @@
             document.getElementById('gauge-percent').textContent = Math.round(gaugePercent) + '%';
             
             const levelElement = document.getElementById('threat-level');
-            const levelEmoji = threat.level === 'SAFE' ? '🟢' : threat.level === 'CAUTION' ? '🟡' : threat.level === 'DANGER' ? '🟠' : '🔴';
-            levelElement.textContent = levelEmoji + ' ' + threat.level;
+            const levelEmoji = threat.level === 'SAFE' ? '🟢' : threat.level === 'CAUTION' ? '🟡' : threat.level === 'DANGER' ? '🟠' : threat.level === 'CRITICAL' ? '🔴' : '🔒';
+            levelElement.textContent = levelEmoji + ' ' + (threat.level === 'LOCKED' ? '잠금됨' : threat.level);
             levelElement.className = 'threat-level-large ' + threat.level.toLowerCase();
             
             const statusIndicator = document.getElementById('status-indicator');
             statusIndicator.className = 'status-indicator ' + threat.level.toLowerCase();
-            document.getElementById('status-text').textContent = threat.level;
+            document.getElementById('status-text').textContent = threat.level === 'LOCKED' ? '잠금' : threat.level;
             
             // 센서 데이터
             document.getElementById('sensor-distance').textContent = Math.round(sensorData.distance) + 'cm';
@@ -669,23 +696,12 @@
             document.getElementById('sensor-housing-bar').style.width = sensorData.housingOpen ? '100%' : '0%';
             document.getElementById('contrib-housing').textContent = threat.contributions.h.toFixed(3);
             
-            // 타임라인
-            threatHistory.push({score: threat.score, level: threat.level, time: Date.now()});
-            if (threatHistory.length > MAX_HISTORY) threatHistory.shift();
-            updateTimeline();
+            document.getElementById('sensor-password').textContent = sensorData.passwordFailures + '회';
+            document.getElementById('sensor-password-bar').style.width = Math.min((sensorData.passwordFailures / 5) * 100, 100) + '%';
+            const pwStatus = sensorData.doorLocked ? '🔒 잠금됨' : sensorData.passwordFailures > 0 ? '⚠️ ' + sensorData.passwordFailures + '회' : '정상';
+            document.getElementById('contrib-password').textContent = pwStatus;
             
-            // 알림
             checkAndCreateAlerts(threat);
-        }
-        
-        function updateTimeline() {
-            const container = document.getElementById('timeline-container');
-            const step = Math.max(1, Math.floor(threatHistory.length / 30));
-            
-            container.innerHTML = threatHistory
-                .filter((_, i) => i % step === 0)
-                .map(h => `<div class="timeline-dot ${h.level.toLowerCase()}" title="${h.score.toFixed(2)}"></div>`)
-                .join('');
         }
         
         function checkAndCreateAlerts(threat) {
@@ -713,7 +729,7 @@
             if (alertHistory.length > 10) alertHistory.shift();
             
             const container = document.getElementById('alerts-container');
-            const alertClass = type === 'CRITICAL' ? 'critical' : type === 'WARNING' ? 'warning' : 'info';
+            const alertClass = type === 'CRITICAL' ? 'critical' : type === 'WARNING' ? 'warning' : type === 'LOCKED' ? 'locked' : 'info';
             
             const alertHTML = `
                 <div class="alert-item ${alertClass}">
