@@ -144,6 +144,7 @@
             border: 1px solid #00ff88;
             color: #00ff88;
             display: none;
+            font-size: 0.9em;
         }
         
         .status.show {
@@ -178,7 +179,7 @@
         <div class="title">🎮 센서 시뮬레이터</div>
         
         <div class="info">
-            💡 슬라이더를 조정하고 "전송"을 눌러 monitor.html과 동기화하세요!
+            💡 슬라이더를 움직이면 자동으로 Monitor와 동기화됩니다!
         </div>
         
         <!-- 거리 제어 -->
@@ -245,40 +246,50 @@
         
         <!-- 버튼 그룹 -->
         <div class="button-group">
-            <button class="btn-send" onclick="sendData()">📤 전송</button>
+            <button class="btn-send" onclick="sendData()">🔄 수동전송</button>
             <button class="btn-reset" onclick="resetData()">🔄 초기화</button>
         </div>
         
-        <div class="status" id="status">✅ 데이터가 전송되었습니다!</div>
+        <div class="status" id="status">✅ 자동 동기화 중...</div>
     </div>
     
     <script>
-        // 슬라이더 값 업데이트
+        // 슬라이더 값 업데이트 + 자동 전송
         document.getElementById('distance').addEventListener('input', (e) => {
             document.getElementById('distance-value').textContent = e.target.value;
+            sendData();
         });
         
         document.getElementById('dwell').addEventListener('input', (e) => {
             document.getElementById('dwell-value').textContent = e.target.value;
+            sendData();
         });
         
         document.getElementById('loiter').addEventListener('input', (e) => {
             document.getElementById('loiter-value').textContent = parseFloat(e.target.value).toFixed(1);
+            sendData();
         });
         
         document.getElementById('vibration').addEventListener('input', (e) => {
             document.getElementById('vibration-value').textContent = parseFloat(e.target.value).toFixed(1);
+            sendData();
         });
         
         document.getElementById('audio').addEventListener('input', (e) => {
             document.getElementById('audio-value').textContent = e.target.value;
+            sendData();
         });
         
         document.getElementById('direction').addEventListener('input', (e) => {
             document.getElementById('direction-value').textContent = e.target.value;
+            sendData();
         });
         
-        // 데이터 전송
+        document.getElementById('housing').addEventListener('change', (e) => {
+            sendData();
+        });
+        
+        // 데이터 전송 (자동)
         function sendData() {
             const data = {
                 distance: parseFloat(document.getElementById('distance').value),
@@ -297,7 +308,7 @@
             status.classList.add('show');
             setTimeout(() => {
                 status.classList.remove('show');
-            }, 2000);
+            }, 1500);
         }
         
         // 데이터 초기화
