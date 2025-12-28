@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HHJJ AI 도어락 센서 시뮬레이터</title>
+    <title>HHJJ AI 도어락 시뮬레이터</title>
     <style>
         * {
             margin: 0;
@@ -14,333 +14,816 @@
         body {
             font-family: 'Segoe UI', sans-serif;
             background: #0a0e27;
-            color: #e0e0e0;
-            overflow-y: auto;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
+            overflow: hidden;
+            color: white;
         }
         
-        .container {
-            background: linear-gradient(135deg, #1a1a2e, #16213e);
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        
+        .ui-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        .ui-layer > * {
+            pointer-events: auto;
+        }
+        
+        #controls-guide {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
             border: 2px solid #00ff88;
-            border-radius: 20px;
-            padding: 30px;
-            max-width: 500px;
-            width: 100%;
-            box-shadow: 0 0 60px rgba(0, 255, 136, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            max-width: 380px;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.6);
         }
         
-        .title {
-            text-align: center;
-            font-size: 1.8em;
+        .guide-title {
             color: #00ff88;
-            text-shadow: 0 0 20px #00ff88;
-            margin-bottom: 30px;
-            font-weight: bold;
-        }
-        
-        .control-group {
-            margin-bottom: 25px;
-        }
-        
-        .label {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            font-size: 1.2em;
             margin-bottom: 10px;
-            font-weight: 500;
+            text-transform: uppercase;
         }
         
-        .value {
-            color: #00ff88;
-            font-weight: bold;
-            font-size: 1.1em;
-        }
-        
-        input[type="range"] {
-            width: 100%;
-            height: 8px;
+        .control-item {
+            margin: 8px 0;
+            padding: 6px;
+            background: rgba(0, 255, 136, 0.1);
             border-radius: 5px;
-            background: rgba(0, 255, 136, 0.2);
-            outline: none;
-            -webkit-appearance: none;
+            font-size: 0.9em;
         }
         
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
+        .key {
+            display: inline-block;
             background: #00ff88;
-            cursor: pointer;
-            box-shadow: 0 0 10px #00ff88;
-        }
-        
-        input[type="range"]::-moz-range-thumb {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: #00ff88;
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 0 10px #00ff88;
-        }
-        
-        input[type="checkbox"] {
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
-            accent-color: #00ff88;
-        }
-        
-        .button-group {
-            display: flex;
-            gap: 10px;
-            margin-top: 30px;
-        }
-        
-        button {
-            flex: 1;
-            padding: 12px;
-            font-size: 1em;
+            color: #0a0e27;
+            padding: 2px 6px;
+            border-radius: 4px;
             font-weight: bold;
-            border: none;
+            margin-right: 5px;
+            font-size: 0.85em;
+        }
+        
+        #action-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #ffaa00;
+            border-radius: 15px;
+            padding: 15px;
+            max-width: 320px;
+            box-shadow: 0 0 30px rgba(255, 170, 0, 0.6);
+        }
+        
+        .action-title {
+            color: #ffaa00;
+            font-size: 1em;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .action-btn {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin: 6px 0;
+            border: 2px solid;
             border-radius: 8px;
+            font-weight: bold;
             cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            font-size: 0.9em;
+        }
+        
+        .action-btn.bell { border-color: #00ff88; }
+        .action-btn.bell:hover { background: rgba(0, 255, 136, 0.2); box-shadow: 0 0 20px rgba(0, 255, 136, 0.6); }
+        
+        .action-btn.drill { border-color: #ff8800; }
+        .action-btn.drill:hover { background: rgba(255, 136, 0, 0.2); box-shadow: 0 0 20px rgba(255, 136, 0, 0.6); }
+        
+        .action-btn.kick { border-color: #ff0044; }
+        .action-btn.kick:hover { background: rgba(255, 0, 68, 0.2); box-shadow: 0 0 20px rgba(255, 0, 68, 0.6); }
+        
+        #status-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.95);
+            border: 3px solid;
+            border-radius: 15px;
+            padding: 20px;
+            min-width: 300px;
+            max-height: 90vh;
+            overflow-y: auto;
             transition: all 0.3s;
         }
         
-        .btn-send {
-            background: #00ff88;
-            color: #0a0e27;
+        #status-panel.SAFE { border-color: #00ff88; box-shadow: 0 0 40px rgba(0, 255, 136, 0.8); }
+        #status-panel.CAUTION { border-color: #ffff00; box-shadow: 0 0 40px rgba(255, 255, 0, 0.8); }
+        #status-panel.DANGER { border-color: #ff8800; box-shadow: 0 0 40px rgba(255, 136, 0, 0.8); }
+        #status-panel.CRITICAL { 
+            border-color: #ff0044; 
+            box-shadow: 0 0 40px rgba(255, 0, 68, 0.8);
+            animation: shake 0.3s infinite;
         }
         
-        .btn-send:hover {
-            background: #00dd99;
-            box-shadow: 0 0 20px #00ff88;
-        }
-        
-        .btn-reset {
-            background: rgba(255, 136, 0, 0.3);
-            color: #ffaa00;
-            border: 2px solid #ffaa00;
-        }
-        
-        .btn-reset:hover {
-            background: rgba(255, 136, 0, 0.5);
-            box-shadow: 0 0 20px rgba(255, 136, 0, 0.5);
-        }
-        
-        .status {
+        .status-level {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin-bottom: 12px;
             text-align: center;
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 8px;
-            background: rgba(0, 255, 136, 0.1);
-            border: 1px solid #00ff88;
+        }
+        
+        .risk-score-container {
+            margin: 15px 0;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .risk-score-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 1em;
+        }
+        
+        .risk-score-value {
+            font-size: 1.6em;
+            font-weight: bold;
             color: #00ff88;
-            display: none;
-            font-size: 0.9em;
         }
         
-        .status.show {
-            display: block;
-            animation: slideIn 0.3s ease-out;
+        .risk-gauge {
+            position: relative;
+            height: 25px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 8px;
         }
         
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        .risk-gauge-fill {
+            height: 100%;
+            transition: width 0.2s, background 0.2s;
+            border-radius: 12px;
+            box-shadow: 0 0 20px currentColor;
         }
         
-        .info {
-            background: rgba(0, 221, 255, 0.1);
-            border: 1px solid #00ddff;
+        .risk-gauge-fill.safe { background: linear-gradient(90deg, #00ff88, #00ddaa); }
+        .risk-gauge-fill.caution { background: linear-gradient(90deg, #ffff00, #ffaa00); }
+        .risk-gauge-fill.danger { background: linear-gradient(90deg, #ff8800, #ff4400); }
+        .risk-gauge-fill.critical { 
+            background: linear-gradient(90deg, #ff0044, #aa0022);
+            animation: pulse-gauge 1s infinite;
+        }
+        
+        @keyframes pulse-gauge {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .risk-markers {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7em;
+            color: #888;
+            margin-top: 4px;
+        }
+        
+        .sensor-breakdown {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .sensor-item {
+            margin: 8px 0;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+        }
+        
+        .sensor-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3px;
+            font-size: 0.85em;
+        }
+        
+        .sensor-bar {
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .sensor-bar-fill {
+            height: 100%;
+            transition: width 0.2s;
+            border-radius: 3px;
+        }
+        
+        .response-box {
+            margin-top: 12px;
+            padding: 10px;
+            background: rgba(255, 0, 68, 0.2);
+            border: 2px solid #ff0044;
             border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 20px;
-            font-size: 0.9em;
-            color: #00ddff;
+            display: none;
+            font-size: 0.85em;
+        }
+        
+        .response-box.show {
+            display: block;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-1deg); }
+            75% { transform: rotate(1deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .timer {
+            position: fixed;
+            bottom: 50%;
+            left: 50%;
+            transform: translate(-50%, 100px);
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #00ff88;
+            text-shadow: 0 0 30px #00ff88;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 200;
+        }
+        
+        #mouse-mode-indicator {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #ffaa00;
+            border-radius: 10px;
+            padding: 12px 15px;
+            font-size: 0.95em;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        #mouse-mode-indicator.view-mode {
+            border-color: #00ff88;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.6);
+        }
+        
+        #mouse-mode-indicator.cursor-mode {
+            border-color: #ffaa00;
+            box-shadow: 0 0 20px rgba(255, 170, 0, 0.6);
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="title">🎮 센서 시뮬레이터</div>
+    <div id="canvas-container"></div>
+    
+    <div class="ui-layer">
+        <div id="mouse-mode-indicator" class="cursor-mode">🖱️ 커서</div>
         
-        <div class="info">
-            💡 슬라이더를 움직이면 자동으로 Monitor와 동기화됩니다!
+        <div id="controls-guide">
+            <div class="guide-title">🎮 조작</div>
+            <div class="control-item"><span class="key">WASD</span> 이동</div>
+            <div class="control-item"><span class="key">Space</span> 점프</div>
+            <div class="control-item"><span class="key">우클릭</span> 시점회전</div>
         </div>
         
-        <!-- 거리 제어 -->
-        <div class="control-group">
-            <div class="label">
-                <span>📏 거리 (cm)</span>
-                <span class="value" id="distance-value">300</span>
+        <div id="action-panel">
+            <div class="action-title">⚡ 위협 시뮬</div>
+            <button class="action-btn bell" onclick="ringDoorbell()">🔔 벨</button>
+            <button class="action-btn drill" onclick="useDrill()" id="drill-btn">🔨 드릴</button>
+            <button class="action-btn kick" onclick="kickDoor()">👟 차기</button>
+            <button class="action-btn" onclick="openHousing()" style="border-color: #ff0044;">🔓 외함</button>
+        </div>
+        
+        <div id="status-panel" class="SAFE">
+            <div class="status-level" id="threat-level">SAFE</div>
+            
+            <div class="risk-score-container">
+                <div class="risk-score-label">
+                    <span>📊 위험도</span>
+                    <span class="risk-score-value" id="risk-score">0.00</span>
+                </div>
+                <div class="risk-gauge">
+                    <div class="risk-gauge-fill safe" id="risk-gauge" style="width: 0%;"></div>
+                </div>
+                <div class="risk-markers">
+                    <div>0.0</div>
+                    <div>0.3</div>
+                    <div>0.6</div>
+                    <div>0.85</div>
+                    <div>1.0+</div>
+                </div>
             </div>
-            <input type="range" id="distance" min="10" max="400" value="300">
-        </div>
-        
-        <!-- 체류시간 제어 -->
-        <div class="control-group">
-            <div class="label">
-                <span>⏱️ 체류시간 (초)</span>
-                <span class="value" id="dwell-value">0</span>
+            
+            <div class="sensor-breakdown">
+                <div style="font-size: 0.8em; color: #aaa; font-weight: bold; margin-bottom: 8px;">📡 센서 누적값</div>
+                
+                <div class="sensor-item">
+                    <div class="sensor-header">
+                        <span>거리</span>
+                        <span id="distance-raw" style="color: #00ff88; font-weight: bold;">300cm</span>
+                    </div>
+                    <div class="sensor-bar">
+                        <div class="sensor-bar-fill" id="distance-bar" style="background: #00ff88; width: 0%;"></div>
+                    </div>
+                    <div style="font-size: 0.75em; color: #888; margin-top: 2px;">기여: <span id="distance-contrib" style="color: #00ff88;">0.000</span></div>
+                </div>
+                
+                <div class="sensor-item">
+                    <div class="sensor-header">
+                        <span>체류</span>
+                        <span id="dwell-raw" style="color: #ffaa00; font-weight: bold;">0초</span>
+                    </div>
+                    <div class="sensor-bar">
+                        <div class="sensor-bar-fill" id="dwell-bar" style="background: #ffaa00; width: 0%;"></div>
+                    </div>
+                    <div style="font-size: 0.75em; color: #888; margin-top: 2px;">기여: <span id="dwell-contrib" style="color: #ffaa00;">0.000</span></div>
+                </div>
+                
+                <div class="sensor-item">
+                    <div class="sensor-header">
+                        <span>배회</span>
+                        <span id="loiter-raw" style="color: #ff8800; font-weight: bold;">0회</span>
+                    </div>
+                    <div class="sensor-bar">
+                        <div class="sensor-bar-fill" id="loiter-bar" style="background: #ff8800; width: 0%;"></div>
+                    </div>
+                    <div style="font-size: 0.75em; color: #888; margin-top: 2px;">기여: <span id="loiter-contrib" style="color: #ff8800;">0.000</span></div>
+                </div>
+                
+                <div class="sensor-item">
+                    <div class="sensor-header">
+                        <span>진동(누적)</span>
+                        <span id="vibration-raw" style="color: #ff6600; font-weight: bold;">0.0</span>
+                    </div>
+                    <div class="sensor-bar">
+                        <div class="sensor-bar-fill" id="vibration-bar" style="background: #ff6600; width: 0%;"></div>
+                    </div>
+                    <div style="font-size: 0.75em; color: #888; margin-top: 2px;">기여: <span id="vibration-contrib" style="color: #ff6600;">0.000</span></div>
+                </div>
+                
+                <div class="sensor-item">
+                    <div class="sensor-header">
+                        <span>음압(누적)</span>
+                        <span id="audio-raw" style="color: #ff4400; font-weight: bold;">40dB</span>
+                    </div>
+                    <div class="sensor-bar">
+                        <div class="sensor-bar-fill" id="audio-bar" style="background: #ff4400; width: 0%;"></div>
+                    </div>
+                    <div style="font-size: 0.75em; color: #888; margin-top: 2px;">기여: <span id="audio-contrib" style="color: #ff4400;">0.000</span></div>
+                </div>
+                
+                <div class="sensor-item">
+                    <div class="sensor-header">
+                        <span>외함</span>
+                        <span id="housing-raw" style="color: #ff0044; font-weight: bold;">정상</span>
+                    </div>
+                    <div class="sensor-bar">
+                        <div class="sensor-bar-fill" id="housing-bar" style="background: #ff0044; width: 0%;"></div>
+                    </div>
+                    <div style="font-size: 0.75em; color: #888; margin-top: 2px;">기여: <span id="housing-contrib" style="color: #ff0044;">0.000</span></div>
+                </div>
             </div>
-            <input type="range" id="dwell" min="0" max="60" value="0">
-        </div>
-        
-        <!-- 배회도 제어 -->
-        <div class="control-group">
-            <div class="label">
-                <span>🔄 배회도</span>
-                <span class="value" id="loiter-value">0.0</span>
-            </div>
-            <input type="range" id="loiter" min="0" max="1" step="0.1" value="0">
-        </div>
-        
-        <!-- 진동 제어 -->
-        <div class="control-group">
-            <div class="label">
-                <span>📳 진동 (G)</span>
-                <span class="value" id="vibration-value">0.0</span>
-            </div>
-            <input type="range" id="vibration" min="0" max="20" step="0.1" value="0">
-        </div>
-        
-        <!-- 음압 제어 -->
-        <div class="control-group">
-            <div class="label">
-                <span>🔊 음압 (dB)</span>
-                <span class="value" id="audio-value">40</span>
-            </div>
-            <input type="range" id="audio" min="40" max="120" value="40">
-        </div>
-        
-        <!-- 외함 개방 -->
-        <div class="control-group">
-            <div class="label">
-                <span>🔓 외함 개방</span>
-                <input type="checkbox" id="housing">
+            
+            <div class="response-box" id="response-box">
+                🚨 자동 대응!
+                <div id="response-actions" style="margin-top: 6px;"></div>
             </div>
         </div>
         
-        <!-- 방향변화 횟수 -->
-        <div class="control-group">
-            <div class="label">
-                <span>↔️ 방향변화 (회)</span>
-                <span class="value" id="direction-value">0</span>
-            </div>
-            <input type="range" id="direction" min="0" max="20" value="0">
-        </div>
-        
-        <!-- 버튼 그룹 -->
-        <div class="button-group">
-            <button class="btn-send" onclick="sendData()">🔄 수동전송</button>
-            <button class="btn-reset" onclick="resetData()">🔄 초기화</button>
-        </div>
-        
-        <div class="status" id="status">✅ 자동 동기화 중...</div>
+        <div class="timer" id="timer"></div>
     </div>
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script>
-        // 슬라이더 값 업데이트 + 자동 전송
-        document.getElementById('distance').addEventListener('input', (e) => {
-            document.getElementById('distance-value').textContent = e.target.value;
-            sendData();
-        });
+        let scene, camera, renderer, player, door, doorLock, sensors;
+        let isRightMouseDown = false;
+        let isDrillingActive = false;
         
-        document.getElementById('dwell').addEventListener('input', (e) => {
-            document.getElementById('dwell-value').textContent = e.target.value;
-            sendData();
-        });
+        let playerState = {
+            position: new THREE.Vector3(0, 1.6, 5),
+            velocity: new THREE.Vector3(0, 0, 0),
+            rotation: 0,
+            pitch: 0,
+            isJumping: false,
+            speed: 0.1
+        };
         
-        document.getElementById('loiter').addEventListener('input', (e) => {
-            document.getElementById('loiter-value').textContent = parseFloat(e.target.value).toFixed(1);
-            sendData();
-        });
+        let keys = {};
         
-        document.getElementById('vibration').addEventListener('input', (e) => {
-            document.getElementById('vibration-value').textContent = parseFloat(e.target.value).toFixed(1);
-            sendData();
-        });
+        let sensorData = {
+            distance: 300,
+            dwellTime: 0,
+            dwellStartTime: null,
+            vibration: 0,
+            audio: 40,
+            housingOpen: false,
+            loiteringScore: 0,
+            positionHistory: [],
+            directionChanges: 0,
+            totalMovement: 0,
+            lastPosition: new THREE.Vector3(0, 0, 5)
+        };
         
-        document.getElementById('audio').addEventListener('input', (e) => {
-            document.getElementById('audio-value').textContent = e.target.value;
-            sendData();
-        });
+        function initScene() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0e27);
+            scene.fog = new THREE.Fog(0x0a0e27, 1, 50);
+            
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.copy(playerState.position);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+            
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            scene.add(ambientLight);
+            
+            const spotLight = new THREE.SpotLight(0xffffff, 1);
+            spotLight.position.set(0, 10, 0);
+            scene.add(spotLight);
+            
+            scene.add(new THREE.GridHelper(50, 50, 0x00ff88, 0x003344));
+            
+            const wall = new THREE.Mesh(
+                new THREE.BoxGeometry(10, 5, 0.2),
+                new THREE.MeshStandardMaterial({ color: 0x1a1a2e })
+            );
+            wall.position.set(0, 2.5, -3);
+            scene.add(wall);
+            
+            door = new THREE.Mesh(
+                new THREE.BoxGeometry(1.5, 3, 0.15),
+                new THREE.MeshStandardMaterial({ color: 0x2a2a3e })
+            );
+            door.position.set(0, 1.5, -2.9);
+            scene.add(door);
+            
+            doorLock = new THREE.Mesh(
+                new THREE.BoxGeometry(0.3, 0.5, 0.15),
+                new THREE.MeshStandardMaterial({ 
+                    color: 0x00ff88, emissive: 0x00ff88, emissiveIntensity: 0.5
+                })
+            );
+            doorLock.position.set(0.6, 1.5, -2.85);
+            scene.add(doorLock);
+            
+            sensors = new THREE.Group();
+            for (let i = 0; i < 3; i++) {
+                const sensor = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.05, 0.05, 0.1),
+                    new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x00ff88, emissiveIntensity: 1.0 })
+                );
+                sensor.position.set((i - 1) * 0.3, 0.5, -2.8);
+                sensor.rotation.x = Math.PI / 2;
+                sensors.add(sensor);
+            }
+            scene.add(sensors);
+            
+            player = new THREE.Mesh(
+                new THREE.BoxGeometry(0.2, 0.1, 0.3),
+                new THREE.MeshStandardMaterial({ color: 0xffcc99 })
+            );
+            player.position.set(0.3, -0.3, -0.5);
+            camera.add(player);
+            scene.add(camera);
+            
+            document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
+            document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+            renderer.domElement.addEventListener('mousedown', e => {
+                if (e.button === 2) isRightMouseDown = true;
+            });
+            renderer.domElement.addEventListener('mouseup', e => {
+                if (e.button === 2) isRightMouseDown = false;
+            });
+            renderer.domElement.addEventListener('mousemove', e => {
+                if (isRightMouseDown) {
+                    playerState.rotation -= e.movementX * 0.003;
+                    playerState.pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, playerState.pitch - e.movementY * 0.003));
+                }
+            });
+            renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+            
+            animate();
+            updateSensors();
+        }
         
-        document.getElementById('direction').addEventListener('input', (e) => {
-            document.getElementById('direction-value').textContent = e.target.value;
-            sendData();
-        });
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (keys['w']) {
+                camera.position.x -= Math.sin(playerState.rotation) * 0.1;
+                camera.position.z -= Math.cos(playerState.rotation) * 0.1;
+            }
+            if (keys['s']) {
+                camera.position.x += Math.sin(playerState.rotation) * 0.1;
+                camera.position.z += Math.cos(playerState.rotation) * 0.1;
+            }
+            if (keys['a']) {
+                camera.position.x -= Math.cos(playerState.rotation) * 0.1;
+                camera.position.z += Math.sin(playerState.rotation) * 0.1;
+            }
+            if (keys['d']) {
+                camera.position.x += Math.cos(playerState.rotation) * 0.1;
+                camera.position.z -= Math.sin(playerState.rotation) * 0.1;
+            }
+            if (keys[' '] && !playerState.isJumping) {
+                playerState.velocity.y = 0.15;
+                playerState.isJumping = true;
+            }
+            
+            camera.position.y += playerState.velocity.y;
+            playerState.velocity.y -= 0.01;
+            if (camera.position.y <= 1.6) {
+                camera.position.y = 1.6;
+                playerState.velocity.y = 0;
+                playerState.isJumping = false;
+            }
+            
+            camera.position.x = Math.max(-8, Math.min(8, camera.position.x));
+            camera.position.z = Math.max(-2.5, Math.min(10, camera.position.z));
+            camera.rotation.y = playerState.rotation;
+            camera.rotation.x = playerState.pitch;
+            
+            sensors.children.forEach((sensor, i) => {
+                sensor.material.emissiveIntensity = 0.5 + Math.sin(Date.now() * 0.003 + i * 2) * 0.5;
+            });
+            
+            const threat = getThreatLevel();
+            updateDoorLock(threat);
+            updateSensorsToMonitor();
+            renderer.render(scene, camera);
+        }
         
-        document.getElementById('housing').addEventListener('change', (e) => {
-            sendData();
-        });
+        function updateSensors() {
+            setInterval(() => {
+                const doorPosition = new THREE.Vector3(0.6, 1.5, -2.85);
+                sensorData.distance = Math.round(camera.position.distanceTo(doorPosition) * 100);
+                
+                if (sensorData.dwellStartTime) {
+                    sensorData.dwellTime = Math.floor((Date.now() - sensorData.dwellStartTime) / 1000);
+                }
+                
+                detectLoitering();
+                
+                sensorData.vibration = Math.max(0, sensorData.vibration - 0.02);
+                sensorData.audio = Math.max(40, sensorData.audio - 0.5);
+                
+                updateUI();
+            }, 100);
+        }
         
-        // 데이터 전송 (자동)
-        function sendData() {
-            const data = {
-                distance: parseFloat(document.getElementById('distance').value),
-                dwellTime: parseFloat(document.getElementById('dwell').value),
-                loiteringScore: parseFloat(document.getElementById('loiter').value),
-                vibration: parseFloat(document.getElementById('vibration').value),
-                audio: parseFloat(document.getElementById('audio').value),
-                housingOpen: document.getElementById('housing').checked,
-                directionChanges: parseInt(document.getElementById('direction').value)
+        function detectLoitering() {
+            const currentPos = camera.position.clone();
+            const doorPos = new THREE.Vector3(0.6, 1.5, -2.85);
+            const distanceToDoor = currentPos.distanceTo(doorPos);
+            
+            if (distanceToDoor < 3) {
+                const movementDelta = currentPos.distanceTo(sensorData.lastPosition);
+                
+                if (movementDelta > 0.01) {
+                    sensorData.totalMovement += movementDelta;
+                    sensorData.positionHistory.push(currentPos.clone());
+                    if (sensorData.positionHistory.length > 20) {
+                        sensorData.positionHistory.shift();
+                    }
+                    
+                    if (sensorData.positionHistory.length >= 3) {
+                        const recent = sensorData.positionHistory.slice(-3);
+                        const dir1 = new THREE.Vector3().subVectors(recent[1], recent[0]).normalize();
+                        const dir2 = new THREE.Vector3().subVectors(recent[2], recent[1]).normalize();
+                        if (dir1.angleTo(dir2) > Math.PI / 2) {
+                            sensorData.directionChanges++;
+                        }
+                    }
+                }
+                
+                sensorData.loiteringScore = Math.min(
+                    (sensorData.totalMovement / 10) * 0.6 + (sensorData.directionChanges / 5) * 0.4, 1.0
+                );
+                
+                if (!sensorData.dwellStartTime) {
+                    sensorData.dwellStartTime = Date.now();
+                }
+                
+                sensorData.lastPosition.copy(currentPos);
+            } else {
+                sensorData.loiteringScore = Math.max(0, sensorData.loiteringScore - 0.01);
+                
+                if (distanceToDoor > 5) {
+                    sensorData.totalMovement = 0;
+                    sensorData.directionChanges = 0;
+                    sensorData.positionHistory = [];
+                    sensorData.dwellStartTime = null;
+                    sensorData.dwellTime = 0;
+                }
+            }
+        }
+        
+        function getThreatLevel() {
+            let d = Math.max(0, (300 - sensorData.distance) / 300);
+            let t = Math.min(sensorData.dwellTime / 30, 1);
+            let l = sensorData.loiteringScore;
+            let v = sensorData.vibration / 20;
+            let a = (sensorData.audio - 40) / 100;
+            let h = sensorData.housingOpen ? 1 : 0;
+            
+            let score = d * 0.20 + t * 0.20 + l * 0.20 + v * 0.20 + a * 0.15 + h * 0.05;
+            
+            return {
+                score: score,
+                level: score < 0.3 ? 'SAFE' : score < 0.6 ? 'CAUTION' : score < 0.85 ? 'DANGER' : 'CRITICAL',
+                contributions: { 
+                    d: d * 0.20, 
+                    t: t * 0.20, 
+                    l: l * 0.20, 
+                    v: v * 0.20, 
+                    a: a * 0.15, 
+                    h: h * 0.05 
+                }
             };
+        }
+        
+        function updateDoorLock(threat) {
+            const level = threat.level;
+            if (level === 'SAFE') {
+                doorLock.material.color.setHex(0x00ff88);
+                doorLock.material.emissive.setHex(0x00ff88);
+            } else if (level === 'CAUTION') {
+                doorLock.material.color.setHex(0xffff00);
+                doorLock.material.emissive.setHex(0xffff00);
+            } else if (level === 'DANGER') {
+                doorLock.material.color.setHex(0xff8800);
+                doorLock.material.emissive.setHex(0xff8800);
+                door.rotation.y = Math.sin(Date.now() * 0.01) * 0.03;
+            } else {
+                doorLock.material.color.setHex(0xff0044);
+                doorLock.material.emissive.setHex(0xff0044);
+                door.rotation.y = Math.sin(Date.now() * 0.02) * 0.08;
+                doorLock.position.x = 0.6 + Math.sin(Date.now() * 0.05) * 0.05;
+            }
+        }
+        
+        function updateUI() {
+            const threat = getThreatLevel();
+            const { score, level, contributions } = threat;
             
+            document.getElementById('risk-score').textContent = score.toFixed(2);
+            document.getElementById('risk-score').style.color = 
+                level === 'SAFE' ? '#00ff88' : level === 'CAUTION' ? '#ffff00' : level === 'DANGER' ? '#ff8800' : '#ff0044';
+            
+            const gauge = document.getElementById('risk-gauge');
+            gauge.style.width = Math.min(score * 100, 100) + '%';
+            gauge.className = 'risk-gauge-fill ' + level.toLowerCase();
+            
+            document.getElementById('distance-raw').textContent = sensorData.distance + 'cm';
+            document.getElementById('distance-contrib').textContent = contributions.d.toFixed(3);
+            document.getElementById('distance-bar').style.width = (Math.min(contributions.d * 500, 100)) + '%';
+            
+            document.getElementById('dwell-raw').textContent = sensorData.dwellTime + '초';
+            document.getElementById('dwell-contrib').textContent = contributions.t.toFixed(3);
+            document.getElementById('dwell-bar').style.width = (Math.min(contributions.t * 500, 100)) + '%';
+            
+            document.getElementById('loiter-raw').textContent = sensorData.directionChanges + '회';
+            document.getElementById('loiter-contrib').textContent = contributions.l.toFixed(3);
+            document.getElementById('loiter-bar').style.width = (Math.min(contributions.l * 500, 100)) + '%';
+            
+            document.getElementById('vibration-raw').textContent = sensorData.vibration.toFixed(1);
+            document.getElementById('vibration-contrib').textContent = contributions.v.toFixed(3);
+            document.getElementById('vibration-bar').style.width = (Math.min(contributions.v * 500, 100)) + '%';
+            
+            document.getElementById('audio-raw').textContent = Math.round(sensorData.audio) + 'dB';
+            document.getElementById('audio-contrib').textContent = contributions.a.toFixed(3);
+            document.getElementById('audio-bar').style.width = (Math.min(contributions.a * 666, 100)) + '%';
+            
+            document.getElementById('housing-raw').textContent = sensorData.housingOpen ? '개방!' : '정상';
+            document.getElementById('housing-contrib').textContent = contributions.h.toFixed(3);
+            document.getElementById('housing-bar').style.width = (Math.min(contributions.h * 2000, 100)) + '%';
+            
+            const panel = document.getElementById('status-panel');
+            panel.className = level;
+            document.getElementById('threat-level').textContent = level;
+            
+            const responseBox = document.getElementById('response-box');
+            if (level === 'DANGER' || level === 'CRITICAL') {
+                responseBox.classList.add('show');
+                const actions = level === 'DANGER' ? 
+                    ['📱 긴급 알림', '📹 녹화', '🔒 강화'] :
+                    ['🚓 신고', '🔐 긴급', '📦 증거', '🔊 경보'];
+                document.getElementById('response-actions').innerHTML = 
+                    actions.map(a => `<div>✓ ${a}</div>`).join('');
+            } else {
+                responseBox.classList.remove('show');
+            }
+        }
+        
+        function updateSensorsToMonitor() {
+            const threat = getThreatLevel();
+            const data = {
+                distance: sensorData.distance,
+                dwellTime: sensorData.dwellTime,
+                loiteringScore: sensorData.loiteringScore,
+                vibration: sensorData.vibration,
+                audio: sensorData.audio,
+                housingOpen: sensorData.housingOpen,
+                directionChanges: sensorData.directionChanges
+            };
             localStorage.setItem('doorlockSensors', JSON.stringify(data));
-            
-            // 상태 메시지 표시
-            const status = document.getElementById('status');
-            status.classList.add('show');
+        }
+        
+        function useDrill() {
+            const btn = document.getElementById('drill-btn');
+            if (isDrillingActive) {
+                isDrillingActive = false;
+                btn.textContent = '🔨 드릴';
+                showTimer('드릴 중지');
+                return;
+            }
+            isDrillingActive = true;
+            btn.textContent = '🔨 중단';
+            showTimer('드릴 시작!');
+            const interval = setInterval(() => {
+                if (!isDrillingActive) {
+                    clearInterval(interval);
+                    return;
+                }
+                sensorData.vibration += 2;
+            }, 300);
+        }
+        
+        function ringDoorbell() {
+            sensorData.audio += 35;
+            showTimer('🔔');
+        }
+        
+        function kickDoor() {
+            sensorData.vibration += 8;
+            sensorData.audio += 50;
+            door.rotation.y = 0.2;
+            setTimeout(() => door.rotation.y = 0, 500);
+            showTimer('👟');
+        }
+        
+        function openHousing() {
+            sensorData.housingOpen = true;
+            doorLock.scale.x = 1.5;
+            showTimer('🔓 외함');
             setTimeout(() => {
-                status.classList.remove('show');
-            }, 1500);
+                sensorData.housingOpen = false;
+                doorLock.scale.x = 1;
+            }, 5000);
         }
         
-        // 데이터 초기화
-        function resetData() {
-            document.getElementById('distance').value = 300;
-            document.getElementById('distance-value').textContent = '300';
-            
-            document.getElementById('dwell').value = 0;
-            document.getElementById('dwell-value').textContent = '0';
-            
-            document.getElementById('loiter').value = 0;
-            document.getElementById('loiter-value').textContent = '0.0';
-            
-            document.getElementById('vibration').value = 0;
-            document.getElementById('vibration-value').textContent = '0.0';
-            
-            document.getElementById('audio').value = 40;
-            document.getElementById('audio-value').textContent = '40';
-            
-            document.getElementById('housing').checked = false;
-            
-            document.getElementById('direction').value = 0;
-            document.getElementById('direction-value').textContent = '0';
-            
-            sendData();
+        function showTimer(text) {
+            const timer = document.getElementById('timer');
+            timer.textContent = text;
+            timer.style.opacity = '1';
+            setTimeout(() => timer.style.opacity = '0', 1500);
         }
         
-        // 페이지 로드 시 자동 전송 시작
-        window.addEventListener('load', () => {
-            // 초기값 전송
-            sendData();
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
         });
+        
+        initScene();
     </script>
 </body>
 </html>
