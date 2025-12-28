@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HHJJ AI 도어락 감지 모니터</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0a0e27;
+            color: #e0e0e0;
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: auto 1fr auto;
+            height: 100vh;
+            gap: 12px;
+            padding: 12px;
+        }
+        
+        .header {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            border: 2px solid #00ff88;
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.3);
+        }
+        
+        .header-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #00ff88;
+            text-shadow: 0 0 20px #00ff88;
+        }
+        
+        .header-status {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        
+        .status-indicator.safe {
+            background: rgba(0, 255, 136, 0.2);
+            border: 2px solid #00ff88;
+            color: #00ff88;
+        }
+        
+        .status-indicator.caution {
+            background: rgba(255, 255, 0, 0.2);
+            border: 2px solid #ffff00;
+            color: #ffff00;
+        }
+        
+        .status-indicator.danger {
+            background: rgba(255, 136, 0, 0.2);
+            border: 2px solid #ff8800;
+            color: #ff8800;
+        }
+        
+        .status-indicator.critical {
+            background: rgba(255, 0, 68, 0.3);
+            border: 2px solid #ff0044;
+            color: #ff0044;
+            animation: pulse-critical 1s infinite;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: blink 1s infinite;
+        }
+        
+        .status-indicator.safe .status-dot { background: #00ff88; }
+        .status-indicator.caution .status-dot { background: #ffff00; }
+        .status-indicator.danger .status-dot { background: #ff8800; }
+        .status-indicator.critical .status-dot { background: #ff0044; }
+        
+        .panel {
+            background: rgba(20, 20, 40, 0.9);
+            border: 2px solid;
+            border-radius: 12px;
+            padding: 16px;
+            overflow-y: auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+        
+        .panel-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid;
+        }
+        
+        #threat-panel {
+            grid-column: 1;
+            grid-row: 2;
+            border-color: #00ff88;
+        }
+        
+        #threat-panel .panel-title {
+            color: #00ff88;
+            border-color: #00ff88;
+        }
+        
+        #sensor-panel {
+            grid-column: 2;
+            grid-row: 2;
+            border-color: #ffaa00;
+        }
+        
+        #sensor-panel .panel-title {
+            color: #ffaa00;
+            border-color: #ffaa00;
+        }
+        
+        #alert-panel {
+            grid-column: 3;
+            grid-row: 2;
+            border-color: #ff0044;
+        }
+        
+        #alert-panel .panel-title {
+            color: #ff0044;
+            border-color: #ff0044;
+        }
+        
+        #timeline-panel {
+            grid-column: 1 / -1;
+            grid-row: 3;
+            border-color: #00ddff;
+            max-height: 150px;
+        }
+        
+        #timeline-panel .panel-title {
+            color: #00ddff;
+            border-color: #00ddff;
+        }
+        
+        /* Threat Panel Styles */
+        .threat-score-container {
+            margin: 16px 0;
+            padding: 16px;
+            background: rgba(0, 255, 136, 0.1);
+            border: 2px solid #00ff88;
+            border-radius: 10px;
+        }
+        
+        .threat-score-value {
+            font-size: 2.4em;
+            font-weight: bold;
+            color: #00ff88;
+            text-shadow: 0 0 20px #00ff88;
+            text-align: center;
+            margin: 12px 0;
+        }
+        
+        .threat-gauge {
+            width: 100%;
+            height: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 12px 0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .threat-gauge-fill {
+            height: 100%;
+            transition: width 0.3s, background 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 8px;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: #fff;
+        }
+        
+        .threat-gauge-fill.safe { background: linear-gradient(90deg, #00ff88, #00ddaa); }
+        .threat-gauge-fill.caution { background: linear-gradient(90deg, #ffff00, #ffaa00); }
+        .threat-gauge-fill.danger { background: linear-gradient(90deg, #ff8800, #ff4400); }
+        .threat-gauge-fill.critical { 
+            background: linear-gradient(90deg, #ff0044, #aa0022);
+            animation: pulse 1s infinite;
+        }
+        
+        .threat-level {
+            text-align: center;
+            font-size: 1.3em;
+            font-weight: bold;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 12px 0;
+        }
+        
+        .threat-level.safe { color: #00ff88; background: rgba(0, 255, 136, 0.2); }
+        .threat-level.caution { color: #ffff00; background: rgba(255, 255, 0, 0.2); }
+        .threat-level.danger { color: #ff8800; background: rgba(255, 136, 0, 0.2); }
+        .threat-level.critical { color: #ff0044; background: rgba(255, 0, 68, 0.2); }
+        
+        /* Sensor Panel Styles */
+        .sensor-item {
+            margin: 12px 0;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        
+        .sensor-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            font-size: 0.95em;
+            font-weight: 500;
+        }
+        
+        .sensor-name { color: #e0e0e0; }
+        .sensor-value { font-weight: bold; }
+        
+        .sensor-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 6px 0;
+        }
+        
+        .sensor-bar-fill {
+            height: 100%;
+            transition: width 0.2s;
+            border-radius: 4px;
+        }
+        
+        .sensor-contrib {
+            font-size: 0.75em;
+            color: #aaa;
+            margin-top: 4px;
+        }
+        
+        .sensor-item.distance { border-left-color: #00ff88; }
+        .sensor-item.distance .sensor-value { color: #00ff88; }
+        .sensor-item.distance .sensor-bar-fill { background: #00ff88; }
+        
+        .sensor-item.dwell { border-left-color: #ffaa00; }
+        .sensor-item.dwell .sensor-value { color: #ffaa00; }
+        .sensor-item.dwell .sensor-bar-fill { background: #ffaa00; }
+        
+        .sensor-item.loiter { border-left-color: #ff8800; }
+        .sensor-item.loiter .sensor-value { color: #ff8800; }
+        .sensor-item.loiter .sensor-bar-fill { background: #ff8800; }
+        
+        .sensor-item.vibration { border-left-color: #ff6600; }
+        .sensor-item.vibration .sensor-value { color: #ff6600; }
+        .sensor-item.vibration .sensor-bar-fill { background: #ff6600; }
+        
+        .sensor-item.audio { border-left-color: #ff4400; }
+        .sensor-item.audio .sensor-value { color: #ff4400; }
+        .sensor-item.audio .sensor-bar-fill { background: #ff4400; }
+        
+        .sensor-item.housing { border-left-color: #ff0044; }
+        .sensor-item.housing .sensor-value { color: #ff0044; }
+        .sensor-item.housing .sensor-bar-fill { background: #ff0044; }
+        
+        /* Alert Panel Styles */
+        .alert-item {
+            margin: 10px 0;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid;
+            font-size: 0.9em;
+            display: none;
+        }
+        
+        .alert-item.show { display: block; animation: slideIn 0.3s ease-out; }
+        
+        .alert-time {
+            font-size: 0.75em;
+            color: #888;
+            margin-bottom: 4px;
+        }
+        
+        .alert-message {
+            color: #e0e0e0;
+            font-weight: 500;
+        }
+        
+        .alert-item.info {
+            background: rgba(0, 221, 255, 0.1);
+            border-left-color: #00ddff;
+        }
+        
+        .alert-item.warning {
+            background: rgba(255, 255, 0, 0.1);
+            border-left-color: #ffff00;
+        }
+        
+        .alert-item.critical {
+            background: rgba(255, 0, 68, 0.15);
+            border-left-color: #ff0044;
+        }
+        
+        /* Timeline Styles */
+        .timeline-container {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 8px 0;
+            height: 60px;
+            align-items: center;
+        }
+        
+        .timeline-event {
+            min-width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+        
+        .timeline-event:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.5);
+        }
+        
+        .timeline-event.safe { background: rgba(0, 255, 136, 0.2); border-color: #00ff88; }
+        .timeline-event.caution { background: rgba(255, 255, 0, 0.2); border-color: #ffff00; }
+        .timeline-event.danger { background: rgba(255, 136, 0, 0.2); border-color: #ff8800; }
+        .timeline-event.critical { background: rgba(255, 0, 68, 0.2); border-color: #ff0044; }
+        
+        /* Animations */
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        
+        @keyframes pulse-critical {
+            0%, 100% { box-shadow: 0 0 20px rgba(255, 0, 68, 0.8); }
+            50% { box-shadow: 0 0 40px rgba(255, 0, 68, 1); }
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        /* Scrollbar */
+        .panel::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .panel::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.3);
+        }
+        
+        .panel::-webkit-scrollbar-thumb {
+            background: rgba(0, 255, 136, 0.5);
+            border-radius: 4px;
+        }
+        
+        .panel::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 255, 136, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-title">🔐 HHJJ AI 도어락 감지 모니터</div>
+            <div class="header-status">
+                <div class="status-indicator safe" id="status-indicator">
+                    <span class="status-dot"></span>
+                    <span id="status-text">SAFE</span>
+                </div>
+                <div style="color: #aaa;">
+                    업데이트: <span id="last-update" style="color: #00ff88;">방금</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="threat-panel" class="panel">
+            <div class="panel-title">📊 위협도 분석</div>
+            
+            <div class="threat-score-container">
+                <div style="color: #aaa; font-size: 0.9em;">현재 위험도</div>
+                <div class="threat-score-value" id="threat-score">0.00</div>
+                <div class="threat-gauge">
+                    <div class="threat-gauge-fill safe" id="threat-gauge" style="width: 0%;">
+                        <span id="gauge-percent">0%</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="threat-level safe" id="threat-level">🟢 SAFE</div>
+            
+            <div style="font-size: 0.85em; color: #aaa; margin: 12px 0;">
+                <div style="margin: 6px 0;">레벨별 범위:</div>
+                <div style="display: grid; gap: 4px;">
+                    <div>🟢 SAFE: 0.00 ~ 0.30</div>
+                    <div>🟡 CAUTION: 0.30 ~ 0.60</div>
+                    <div>🟠 DANGER: 0.60 ~ 0.85</div>
+                    <div>🔴 CRITICAL: 0.85+</div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 12px; padding: 10px; background: rgba(0, 0, 0, 0.3); border-radius: 8px; border-left: 3px solid #00ddff;">
+                <div style="color: #00ddff; font-size: 0.8em; font-weight: bold;">💡 팁</div>
+                <div style="color: #aaa; font-size: 0.8em; margin-top: 4px;">복합 센서 데이터로 오탐 방지. 거리 + 체류 + 배회로 정확도 향상</div>
+            </div>
+        </div>
+        
+        <div id="sensor-panel" class="panel">
+            <div class="panel-title">📡 센서 데이터</div>
+            
+            <div class="sensor-item distance">
+                <div class="sensor-header">
+                    <span class="sensor-name">📏 거리</span>
+                    <span class="sensor-value" id="sensor-distance">300cm</span>
+                </div>
+                <div class="sensor-bar">
+                    <div class="sensor-bar-fill" id="sensor-distance-bar" style="width: 0%;"></div>
+                </div>
+                <div class="sensor-contrib">기여도: <span id="contrib-distance">0.000</span></div>
+            </div>
+            
+            <div class="sensor-item dwell">
+                <div class="sensor-header">
+                    <span class="sensor-name">⏱️ 체류</span>
+                    <span class="sensor-value" id="sensor-dwell">0초</span>
+                </div>
+                <div class="sensor-bar">
+                    <div class="sensor-bar-fill" id="sensor-dwell-bar" style="width: 0%;"></div>
+                </div>
+                <div class="sensor-contrib">기여도: <span id="contrib-dwell">0.000</span></div>
+            </div>
+            
+            <div class="sensor-item loiter">
+                <div class="sensor-header">
+                    <span class="sensor-name">🔄 배회</span>
+                    <span class="sensor-value" id="sensor-loiter">0회</span>
+                </div>
+                <div class="sensor-bar">
+                    <div class="sensor-bar-fill" id="sensor-loiter-bar" style="width: 0%;"></div>
+                </div>
+                <div class="sensor-contrib">기여도: <span id="contrib-loiter">0.000</span></div>
+            </div>
+            
+            <div class="sensor-item vibration">
+                <div class="sensor-header">
+                    <span class="sensor-name">📳 진동</span>
+                    <span class="sensor-value" id="sensor-vibration">0.0</span>
+                </div>
+                <div class="sensor-bar">
+                    <div class="sensor-bar-fill" id="sensor-vibration-bar" style="width: 0%;"></div>
+                </div>
+                <div class="sensor-contrib">기여도: <span id="contrib-vibration">0.000</span></div>
+            </div>
+            
+            <div class="sensor-item audio">
+                <div class="sensor-header">
+                    <span class="sensor-name">🔊 음압</span>
+                    <span class="sensor-value" id="sensor-audio">40dB</span>
+                </div>
+                <div class="sensor-bar">
+                    <div class="sensor-bar-fill" id="sensor-audio-bar" style="width: 0%;"></div>
+                </div>
+                <div class="sensor-contrib">기여도: <span id="contrib-audio">0.000</span></div>
+            </div>
+            
+            <div class="sensor-item housing">
+                <div class="sensor-header">
+                    <span class="sensor-name">🔓 외함</span>
+                    <span class="sensor-value" id="sensor-housing">정상</span>
+                </div>
+                <div class="sensor-bar">
+                    <div class="sensor-bar-fill" id="sensor-housing-bar" style="width: 0%;"></div>
+                </div>
+                <div class="sensor-contrib">기여도: <span id="contrib-housing">0.000</span></div>
+            </div>
+        </div>
+        
+        <div id="alert-panel" class="panel">
+            <div class="panel-title">🚨 실시간 알림</div>
+            <div id="alerts-container" style="height: 100%;">
+                <div style="text-align: center; color: #888; padding: 20px;">
+                    대기 중...
+                </div>
+            </div>
+        </div>
+        
+        <div id="timeline-panel" class="panel">
+            <div class="panel-title">📈 위협도 타임라인</div>
+            <div class="timeline-container" id="timeline-container"></div>
+        </div>
+    </div>
+    
+    <script>
+        // 센서 데이터 저장소
+        let sensorData = {
+            distance: 300,
+            dwellTime: 0,
+            loiteringScore: 0,
+            vibration: 0,
+            audio: 40,
+            housingOpen: false,
+            directionChanges: 0
+        };
+        
+        let threatHistory = [];
+        let alertHistory = [];
+        const MAX_HISTORY = 120;
+        let isConnected = false;
+        
+        // localStorage에서 시뮬레이터 데이터 수신
+        function initializeSensorSimulation() {
+            setInterval(() => {
+                const stored = localStorage.getItem('doorlockSensors');
+                if (stored) {
+                    try {
+                        const data = JSON.parse(stored);
+                        sensorData = {
+                            distance: data.distance || 300,
+                            dwellTime: data.dwellTime || 0,
+                            loiteringScore: data.loiteringScore || 0,
+                            vibration: data.vibration || 0,
+                            audio: data.audio || 40,
+                            housingOpen: data.housingOpen || false,
+                            directionChanges: data.directionChanges || 0
+                        };
+                        isConnected = true;
+                    } catch (e) {
+                        // localStorage 파싱 실패 시 로컬 시뮬 계속 실행
+                        localSimulation();
+                    }
+                } else {
+                    // 시뮬레이터 데이터 없으면 로컬 시뮬레이션
+                    isConnected = false;
+                    localSimulation();
+                }
+                
+                updateDisplay();
+            }, 100);  // 100ms 주기 (시뮬레이터와 동일)
+        }
+        
+        function localSimulation() {
+            // 로컬 센서 시뮬레이션 (시뮬레이터 미연동 시)
+            sensorData.distance = Math.max(10, sensorData.distance + (Math.random() - 0.5) * 20);
+            sensorData.vibration = Math.max(0, sensorData.vibration - 0.05 + Math.random() * 0.1);
+            sensorData.audio = Math.max(40, sensorData.audio - 0.3 + Math.random() * 0.5);
+            
+            if (sensorData.distance < 100) {
+                sensorData.dwellTime += 1;
+                sensorData.loiteringScore += 0.01;
+            } else {
+                sensorData.dwellTime = Math.max(0, sensorData.dwellTime - 1);
+                sensorData.loiteringScore = Math.max(0, sensorData.loiteringScore - 0.01);
+            }
+            
+            sensorData.dwellTime = Math.min(sensorData.dwellTime, 60);
+            sensorData.loiteringScore = Math.min(sensorData.loiteringScore, 1);
+        }
+        
+        function calculateThreatLevel() {
+            const d = Math.max(0, (300 - sensorData.distance) / 300);
+            const t = Math.min(sensorData.dwellTime / 30, 1);
+            const l = sensorData.loiteringScore;
+            const v = sensorData.vibration / 20;
+            const a = Math.max(0, (sensorData.audio - 40) / 100);
+            const h = sensorData.housingOpen ? 1 : 0;
+            
+            const score = d * 0.20 + t * 0.20 + l * 0.20 + v * 0.20 + a * 0.15 + h * 0.05;
+            
+            return {
+                score: score,
+                level: score < 0.3 ? 'SAFE' : score < 0.6 ? 'CAUTION' : score < 0.85 ? 'DANGER' : 'CRITICAL',
+                contributions: {
+                    d: d * 0.20,
+                    t: t * 0.20,
+                    l: l * 0.20,
+                    v: v * 0.20,
+                    a: a * 0.15,
+                    h: h * 0.05
+                }
+            };
+        }
+        
+        function updateDisplay() {
+            const threat = calculateThreatLevel();
+            
+            // 위협도 업데이트
+            document.getElementById('threat-score').textContent = threat.score.toFixed(2);
+            document.getElementById('threat-score').style.color = 
+                threat.level === 'SAFE' ? '#00ff88' : 
+                threat.level === 'CAUTION' ? '#ffff00' :
+                threat.level === 'DANGER' ? '#ff8800' : '#ff0044';
+            
+            const gaugePercent = Math.min(threat.score * 100, 100);
+            document.getElementById('threat-gauge').style.width = gaugePercent + '%';
+            document.getElementById('threat-gauge').className = 'threat-gauge-fill ' + threat.level.toLowerCase();
+            document.getElementById('gauge-percent').textContent = Math.round(gaugePercent) + '%';
+            
+            // 위협 레벨 업데이트
+            const levelElement = document.getElementById('threat-level');
+            const levelEmoji = threat.level === 'SAFE' ? '🟢' : threat.level === 'CAUTION' ? '🟡' : threat.level === 'DANGER' ? '🟠' : '🔴';
+            levelElement.textContent = levelEmoji + ' ' + threat.level;
+            levelElement.className = 'threat-level ' + threat.level.toLowerCase();
+            
+            // 상태 표시기
+            const statusIndicator = document.getElementById('status-indicator');
+            statusIndicator.className = 'status-indicator ' + threat.level.toLowerCase();
+            document.getElementById('status-text').textContent = threat.level;
+            
+            // 센서 데이터 업데이트
+            document.getElementById('sensor-distance').textContent = Math.round(sensorData.distance) + 'cm';
+            document.getElementById('sensor-distance-bar').style.width = Math.min(threat.contributions.d * 500, 100) + '%';
+            document.getElementById('contrib-distance').textContent = threat.contributions.d.toFixed(3);
+            
+            document.getElementById('sensor-dwell').textContent = sensorData.dwellTime + '초';
+            document.getElementById('sensor-dwell-bar').style.width = Math.min(threat.contributions.t * 500, 100) + '%';
+            document.getElementById('contrib-dwell').textContent = threat.contributions.t.toFixed(3);
+            
+            document.getElementById('sensor-loiter').textContent = sensorData.directionChanges + '회';
+            document.getElementById('sensor-loiter-bar').style.width = Math.min(threat.contributions.l * 500, 100) + '%';
+            document.getElementById('contrib-loiter').textContent = threat.contributions.l.toFixed(3);
+            
+            document.getElementById('sensor-vibration').textContent = sensorData.vibration.toFixed(1);
+            document.getElementById('sensor-vibration-bar').style.width = Math.min(threat.contributions.v * 500, 100) + '%';
+            document.getElementById('contrib-vibration').textContent = threat.contributions.v.toFixed(3);
+            
+            document.getElementById('sensor-audio').textContent = Math.round(sensorData.audio) + 'dB';
+            document.getElementById('sensor-audio-bar').style.width = Math.min(threat.contributions.a * 666, 100) + '%';
+            document.getElementById('contrib-audio').textContent = threat.contributions.a.toFixed(3);
+            
+            document.getElementById('sensor-housing').textContent = sensorData.housingOpen ? '개방!' : '정상';
+            document.getElementById('sensor-housing-bar').style.width = sensorData.housingOpen ? '100%' : '0%';
+            document.getElementById('contrib-housing').textContent = threat.contributions.h.toFixed(3);
+            
+            // 업데이트 시간
+            const now = new Date();
+            document.getElementById('last-update').textContent = now.getHours().toString().padStart(2, '0') + ':' + 
+                                                                now.getMinutes().toString().padStart(2, '0') + ':' +
+                                                                now.getSeconds().toString().padStart(2, '0');
+            
+            // 위협도 타임라인
+            threatHistory.push({score: threat.score, level: threat.level, time: Date.now()});
+            if (threatHistory.length > MAX_HISTORY) threatHistory.shift();
+            updateTimeline();
+            
+            // 알림 생성
+            checkAndCreateAlerts(threat);
+        }
+        
+        function updateTimeline() {
+            const container = document.getElementById('timeline-container');
+            const step = Math.max(1, Math.floor(threatHistory.length / 30));
+            
+            container.innerHTML = threatHistory
+                .filter((_, i) => i % step === 0)
+                .map(h => `<div class="timeline-event ${h.level.toLowerCase()}" title="${h.score.toFixed(2)}"></div>`)
+                .join('');
+        }
+        
+        function checkAndCreateAlerts(threat) {
+            const lastAlert = alertHistory[alertHistory.length - 1];
+            
+            if (!lastAlert || lastAlert.level !== threat.level) {
+                addAlert(threat.level, `위협도 변화: ${threat.level}로 진입 (${threat.score.toFixed(2)})`);
+            }
+            
+            if (threat.level === 'DANGER') {
+                if (!lastAlert || lastAlert.type !== 'danger') {
+                    addAlert('WARNING', '⚠️ DANGER 레벨! 긴급 대응 준비');
+                }
+            }
+            
+            if (threat.level === 'CRITICAL') {
+                if (!lastAlert || lastAlert.type !== 'critical') {
+                    addAlert('CRITICAL', '🚨 CRITICAL! 즉시 대응 필요 - 경찰 신고 / 강화 모드 활성화');
+                }
+            }
+        }
+        
+        function addAlert(type, message) {
+            const now = new Date();
+            const time = now.getHours().toString().padStart(2, '0') + ':' + 
+                        now.getMinutes().toString().padStart(2, '0') + ':' +
+                        now.getSeconds().toString().padStart(2, '0');
+            
+            alertHistory.push({type, message, time, level: type});
+            if (alertHistory.length > 20) alertHistory.shift();
+            
+            const container = document.getElementById('alerts-container');
+            const alertClass = type === 'CRITICAL' ? 'critical' : type === 'WARNING' ? 'warning' : 'info';
+            
+            const alertHTML = `
+                <div class="alert-item show ${alertClass}">
+                    <div class="alert-time">🕐 ${time}</div>
+                    <div class="alert-message">${message}</div>
+                </div>
+            `;
+            
+            container.innerHTML = alertHTML + container.innerHTML;
+            
+            // 구 경고 제거
+            const alerts = container.querySelectorAll('.alert-item');
+            if (alerts.length > 10) {
+                alerts[alerts.length - 1].remove();
+            }
+        }
+        
+        // 외함 개방 시뮬레이션 (테스트용)
+        function simulateHousingOpen() {
+            sensorData.housingOpen = true;
+            setTimeout(() => {
+                sensorData.housingOpen = false;
+            }, 5000);
+        }
+        
+        // 드릴 공격 시뮬레이션 (테스트용)
+        function simulateDrill() {
+            sensorData.vibration = 18;
+            sensorData.audio = 95;
+            setTimeout(() => {
+                sensorData.vibration -= 5;
+            }, 1000);
+        }
+        
+        // 초기화
+        initializeSensorSimulation();
+        
+        // 키보드 단축키
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'h') simulateHousingOpen();
+            if (e.key === 'd') simulateDrill();
+        });
+    </script>
+</body>
+</html>
