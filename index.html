@@ -327,6 +327,7 @@
             <button class="action-btn drill" onclick="useDrill()" id="drill-btn">🔨 드릴</button>
             <button class="action-btn kick" onclick="kickDoor()">👟 차기</button>
             <button class="action-btn" onclick="openHousing()" style="border-color: #ff0044;">🔓 외함</button>
+            <button class="action-btn" onclick="wrongPassword()" style="border-color: #9900ff;">🔑 비밀번호</button>
         </div>
         
         <div id="status-panel" class="SAFE">
@@ -456,7 +457,8 @@
             positionHistory: [],
             directionChanges: 0,
             totalMovement: 0,
-            lastPosition: new THREE.Vector3(0, 0, 5)
+            lastPosition: new THREE.Vector3(0, 0, 5),
+            passwordFailures: 0
         };
         
         function initScene() {
@@ -587,6 +589,7 @@
             
             const threat = getThreatLevel();
             updateDoorLock(threat);
+            updateSensorsToMonitor();
             renderer.render(scene, camera);
         }
         
@@ -595,7 +598,6 @@
                 const doorPosition = new THREE.Vector3(0.6, 1.5, -2.85);
                 sensorData.distance = Math.round(camera.position.distanceTo(doorPosition) * 100);
                 
-                // ✅ 체류시간 업데이트 (배회 중에는 detectLoitering에서 시작)
                 if (sensorData.dwellStartTime) {
                     sensorData.dwellTime = Math.floor((Date.now() - sensorData.dwellStartTime) / 1000);
                 }
@@ -609,7 +611,6 @@
             }, 100);
         }
         
-        // ✅ 배회 로직 수정: 배회하면 체류시간도 자동 증가
         function detectLoitering() {
             const currentPos = camera.position.clone();
             const doorPos = new THREE.Vector3(0.6, 1.5, -2.85);
@@ -639,7 +640,6 @@
                     (sensorData.totalMovement / 10) * 0.6 + (sensorData.directionChanges / 5) * 0.4, 1.0
                 );
                 
-                // ✅ 핵심 수정: 배회 중이면 체류시간 타이머 자동 시작
                 if (!sensorData.dwellStartTime) {
                     sensorData.dwellStartTime = Date.now();
                 }
@@ -652,7 +652,6 @@
                     sensorData.totalMovement = 0;
                     sensorData.directionChanges = 0;
                     sensorData.positionHistory = [];
-                    // ✅ 멀어지면 체류시간도 리셋
                     sensorData.dwellStartTime = null;
                     sensorData.dwellTime = 0;
                 }
@@ -664,10 +663,11 @@
             let t = Math.min(sensorData.dwellTime / 30, 1);
             let l = sensorData.loiteringScore;
             let v = sensorData.vibration / 20;
-            let a = (sensorData.audio - 40) / 100;
+            let a = Math.max(0, (sensorData.audio - 40) / 100);
             let h = sensorData.housingOpen ? 1 : 0;
+            let pw = Math.min(sensorData.passwordFailures / 5, 1);
             
-            let score = d * 0.20 + t * 0.20 + l * 0.20 + v * 0.20 + a * 0.15 + h * 0.05;
+            let score = d * 0.20 + t * 0.20 + l * 0.20 + v * 0.20 + a * 0.15 + h * 0.05 + pw * 0.30;
             
             return {
                 score: score,
@@ -678,7 +678,8 @@
                     l: l * 0.20, 
                     v: v * 0.20, 
                     a: a * 0.15, 
-                    h: h * 0.05 
+                    h: h * 0.05,
+                    pw: pw * 0.30
                 }
             };
         }
@@ -739,6 +740,13 @@
             document.getElementById('housing-contrib').textContent = contributions.h.toFixed(3);
             document.getElementById('housing-bar').style.width = (Math.min(contributions.h * 2000, 100)) + '%';
             
+            // 비밀번호 센서 (패널에 없으면 콘솔에만 출력)
+            if (document.getElementById('password-raw')) {
+                document.getElementById('password-raw').textContent = sensorData.passwordFailures + '회';
+                document.getElementById('password-contrib').textContent = contributions.pw.toFixed(3);
+                document.getElementById('password-bar').style.width = (Math.min((sensorData.passwordFailures / 5) * 100, 100)) + '%';
+            }
+            
             const panel = document.getElementById('status-panel');
             panel.className = level;
             document.getElementById('threat-level').textContent = level;
@@ -754,6 +762,21 @@
             } else {
                 responseBox.classList.remove('show');
             }
+        }
+        
+        function updateSensorsToMonitor() {
+            const threat = getThreatLevel();
+            const data = {
+                distance: sensorData.distance,
+                dwellTime: sensorData.dwellTime,
+                loiteringScore: sensorData.loiteringScore,
+                vibration: sensorData.vibration,
+                audio: sensorData.audio,
+                housingOpen: sensorData.housingOpen,
+                directionChanges: sensorData.directionChanges,
+                passwordFailures: sensorData.passwordFailures
+            };
+            localStorage.setItem('doorlockSensors', JSON.stringify(data));
         }
         
         function useDrill() {
@@ -797,6 +820,17 @@
                 sensorData.housingOpen = false;
                 doorLock.scale.x = 1;
             }, 5000);
+        }
+        
+        function wrongPassword() {
+            sensorData.passwordFailures++;
+            showTimer('🔑 오류 ' + sensorData.passwordFailures + '회');
+            
+            // 5회 이상이면 경고
+            if (sensorData.passwordFailures >= 5) {
+                showTimer('🚨 잠금됨!');
+                sensorData.passwordFailures = 5;
+            }
         }
         
         function showTimer(text) {
